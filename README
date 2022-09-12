@@ -1,0 +1,123 @@
+# perl
+run_agena_basecounts.pl # run basecounts for agena SNPs
+run_bam_readcount.pl # run bam-readcount for known (exome) SNP positions
+run_bedtools_coverage.pl # run bedtools coverage for target intervals
+run_get_insert_size.pl # run to get fragment sizes
+
+# R
+agena_fingerprinting.R # format and contrast agena SNP vafs
+assess_contamination.R # compares sample pairs with high contamination
+compare_batches.R # look for batch effects
+compare_tumour_content_estimates.R # compare all tumour content estimations
+compare_tumour_content_max_vaf.R # use maximum somatic VAF to estimate tumour content
+custom_format_ensemble_mutations.R # generate ensemble mutation calls (no matched normals)
+examine_fragment_sizes_global.R # compare/plot global fragment sizes
+examine_fragment_sizes_mutations.R # compare/plot fragment sizes at target mutation sites
+exome_compare.R
+extract_triallelic_sites_mutect.R # use MuTect (v1) stats file to identify triallelic sites
+filter_mavis_to_regions.R
+find_reversions.R
+find_triallelic_snps.R # use bam-readcounts for germline SNP to find triallelic variants
+format_and_plot_tumour_content_bamreadcount.R # create plots for tumour content and clearance
+format_mutations_for_cbio.R # format mutations calls for cbioportal
+format_readcount_output.R
+plot_CN_mops_data.R
+plot_interval_coverage.R
+plot_mutation_summary.R
+plot_reversions.R
+plot_sample_timeline.R # create a pretty timeline plot
+plot_snv_summary.R
+plot_wxs_ctdna_comparison_alt.R
+plot_wxs_ctdna_comparison.R # create a dotmap (mutation type + VAF) for known mutations)
+run_panelCN_mops.R # custom version from pipeline-suite; use to evaluate alternate parameters
+summary_stats_clearance.R # is clearnace associated with cohort/age/response/etc (TP53 VAF only)
+summary_stats_clearance_v2.R # is clearnace associated with cohort/age/response/etc (TP53 | Max VAF)
+summary_stats_tumorContent.R # is tumour content associated with cohort/age/response/etc (TP53 VAF only)
+summary_stats_tumorContent_v2.R # is tumour content associated with cohort/age/response/etc (TP53 | Max VAF)
+survival_stats_clearance.R # is clearance associated with OS | DFS (TP53 VAF only)
+survival_stats_clearance_v2.R # is clearance associated with OS | DFS (TP53 | Max VAF)
+survival_stats_fragmentsize.R # is proportion of short/long fragments associate with OS | DFS
+survival_stats_reversions.R
+validate_mutation_calls.R # contrast WXS and ctDNA variants
+
+# other
+run_spliceAI.sh # run spliceAI on somatic mutation sites
+
+
+## Organize and plot clinical information
+# also plots patient timelines (Figure 1)
+Rscript ~/git/analysis/ctDNA/plot_sample_timeline.R
+
+## assess contamination
+perl ~/git/analysis/ctDNA/run_agena_basecounts.pl -d /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/configs/evolve_ctDNA_rawbams_2022.yaml -t /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/configs/dna_pipeline_config.yaml -p /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/fingerprinting/agena_snps_2col.txt -o /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/fingerprinting --no-wait -c slurm
+
+Rscript ~/git/analysis/ctDNA/agena_fingerprinting.R
+
+## search for batch effects?
+Rscript ~/git/analysis/ctDNA/compare_batches.R
+
+## assess tumour content
+perl ~/git/analysis/ctDNA/run_bam_readcount.pl -d /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/configs/evolve_ctDNA_combined_bam_2022.yaml -t /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/configs/dna_pipeline_config.yaml -o /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/tumour_content -p /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/tumour_content/EVOLVE_panel_covered_mutations.bed --no-wait -c slurm
+
+Rscript ~/git/analysis/ctDNA/format_and_plot_tumour_content_bamreadcount.R
+
+## is tumour content associated with any clinical covariate?
+Rscript ~/git/analysis/ctDNA/summary_stats_tumorContent.R
+Rscript ~/git/analysis/ctDNA/summary_stats_clearance.R
+Rscript ~/git/analysis/ctDNA/survival_stats_clearance.R
+
+# compare above tumour content estimates with maximum VAF (run after ensemble calls)
+# this will fill in most NAs
+# also creates nice plots
+Rscript ~/git/analysis/ctDNA/compare_tumour_content_max_vaf.R
+
+## is (new) tumour content associated with any clinical covariate?
+Rscript ~/git/analysis/ctDNA/summary_stats_tumorContent_v2.R
+Rscript ~/git/analysis/ctDNA/summary_stats_clearance_v2.R
+Rscript ~/git/analysis/ctDNA/survival_stats_clearance_v2.R
+
+## examine fragmentation profiles as a way to evaluate tumour content
+# check global (all reads) and reads covering high-confidence mutations
+perl ~/git/analysis/ctDNA/run_get_insert_size.pl -t /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/configs/dna_pipeline_config.yaml -d /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/configs/evolve_ctDNA_combined_bam_2022.yaml -o /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/tumour_content/fragment_size -c slurm --dry-run
+
+Rscript ~/git/analysis/ctDNA/examine_fragment_sizes_global.R
+Rscript ~/git/analysis/ctDNA/examine_fragment_sizes_mutations.R
+
+# compare above tumour content estimates (TP53, max VAF, short fragments)
+Rscript ~/git/analysis/ctDNA/compare_tumour_content_estimates.R
+
+## generate ensemble mutation calls
+# /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/Ensemble_calls
+module load R
+
+Rscript ~/git/analysis/ctDNA/custom_format_ensemble_mutations.R -p EVOLVE_ctDNA -o . --mutect mutect.tsv --mutect2 mutect2.tsv --varscan varscan.tsv --vardict vardict.tsv --strelka strelka.tsv --pindel pindel.tsv
+
+# get sensitivity metrics for SNV/INDEL tools + ENSEMBLE (vs exome); this will also produce a VennDiagram
+Rscript ~/git/analysis/ctDNA/validate_mutation_calls.R
+
+# format mutation calls for cbioportal (merge with exome data [validated] and novel pathogenic [discovery]
+Rscript ~/git/analysis/ctDNA/format_mutations_for_cbio.R
+
+# create SNV (and CNV) heatmap for both wxs and ctDNA
+Rscript ~/git/analysis/ctDNA/plot_wxs_ctdna_comparison.R
+
+
+## find reversions
+# get readcounts for germline positions (from WXS)
+perl ~/git/analysis/ctDNA/run_bam_readcount.pl -d /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/configs/evolve_ctDNA_combined_bam_2022.yaml -t /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/configs/dna_pipeline_config.yaml -o /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/bam_readcount -p /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/bam_readcount/germline_snp_positions.tsv --no-wait -c slurm
+
+# find triallelic variants
+Rscript ~/git/analysis/ctDNA/find_triallelic_snps.R -p EVOLVE_ctDNA -d /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/bam_readcount -t /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/HaplotypeCaller/CPSR/2022-06-15_EVOLVE_ctDNA_mutations_for_cbioportal.tsv
+
+# find potential splice mutations
+run_spliceAI.sh
+
+# run find_reversions.R
+# please install findReversions package (git@github.com:pughlab/findReversions.git) prior to running
+module load R/3.6.1
+
+Rscript ~/git/analysis/ctDNA/find_reversions.R -d /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/Reversions -p EVOLVE_ctDNA -q EVOLVE_exome_mutations.txt -m ../HaplotypeCaller/cohort/VCF2MAF/2022-07-15_EVOLVE_ctDNA_mutations_for_cbioportal.tsv -v filtered_mavis_output.txt -t /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/CHARM-MMR_plus_EVOLVE_hg38.bed -x /cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/known_exome_reversions.maf -s 2022-07-14_EVOLVE_ctDNA_ensemble_mutations_SPLICEAI.txt -a ../bam_readcount/2022-07-14_EVOLVE_ctDNA_triallelic_SNPs.tsv
+
+
+## manuscript figures
+Rscript ~/git/analysis/ctDNA/manuscript_figure2.R
