@@ -18,7 +18,7 @@ use IO::Handle;
 my $cwd = '/cluster/home/sprokope/git/pipeline-suite/scripts';
 require "$cwd/utilities.pl";
 
-our ($reference);
+our ($reference, $ref_type);
 
 ####################################################################################################
 # version	author		comment
@@ -104,6 +104,31 @@ sub get_insertsize_command_alt {
 	return($command);
 	}
 
+# format command for R script
+sub get_insertsize_r_command {
+	my %args = (
+		input		=> undef,
+		output		=> undef,
+		id		=> undef,
+		intervals	=> undef,
+		@_
+		);
+
+	my $command = join(' ',
+		'Rscript /cluster/home/sprokope/git/analysis/EVOLVE_ctDNA/extract_fragment_sizes.R',
+		'-i', $args{input},
+		'-o', $args{output},
+		'-s', $args{id},
+		'-r', $ref_type
+		);
+
+	if (defined($args{intervals})) {
+		$command .= " -t $args{intervals}";
+		}
+
+	return($command);
+	}
+
 ### MAIN ###########################################################################################
 sub main {
 	my %args = (
@@ -161,6 +186,15 @@ sub main {
 	print $log "\n    Reference used: $tool_data->{reference}";
 
 	$reference = $tool_data->{reference};
+	$ref_type = $tool_data->{ref_type};
+
+	my $intervals_bed = undef;
+	if (defined($tool_data->{intervals_bed})) {
+		print $log "\n    Target intervals: $tool_data->{intervals_bed}";
+		$intervals_bed = $tool_data->{intervals_bed};
+		} else {
+		print $log "\n    Target intervals: default (whole genome tiled)";
+		}
 
 	print $log "\n    Output directory: $output_directory";
 	print $log "\n  Sample config used: $data_config";
@@ -212,7 +246,8 @@ sub main {
 			}
 
 		# create an array to hold final outputs and all patient job ids
-		my (@final_outputs, @patient_jobs, $cleanup_cmd);
+		my (@final_outputs, @patient_jobs);
+		my $cleanup_cmd = '';
 
 		foreach my $sample (@samples) {
 
@@ -259,6 +294,47 @@ sub main {
 				print $log "Skipping because this has already been completed!\n";
 				}
 
+			# using code from Derek/Ming (bin across genome/target regions)
+			$output_file = join('/', $patient_directory, $sample . '_per_bin_sizes.tsv');
+
+			my $bin_command = get_insertsize_r_command(
+				input		=> $smp_data->{$patient}->{$type}->{$sample},
+				output		=> $output_file,
+				id		=> $sample,
+				intervals	=> $intervals_bed,
+				);
+
+			# check if this should be run
+			if ('Y' eq missing_file($output_file)) {
+
+				# record command (in log directory) and then run job
+				print $log "Submitting job for PerBIN...\n";
+
+				$run_script = write_script(
+					log_dir	=> $log_directory,
+					name	=> 'run_extract_insert_sizes_per_bin_' . $sample,
+					cmd	=> $bin_command,
+					modules	=> ['R/4.1.0'],
+					max_time	=> '04:00:00',
+					mem		=> '8G',
+					hpc_driver	=> $args{hpc_driver},
+					extra_args	=> [$hpc_group]
+					);
+
+				$run_id = submit_job(
+					jobname		=> 'run_extract_insert_sizes_per_bin_' . $sample,
+					shell_command	=> $run_script,
+					hpc_driver	=> $args{hpc_driver},
+					dry_run		=> $args{dry_run},
+					log_file	=> $log
+					);
+
+				push @patient_jobs, $run_id;
+				push @all_jobs, $run_id;
+				} else {
+				print $log "Skipping because PerBIN has already been completed!\n";
+				}
+
 			# alternate version (split by variant status)
 			my $output_stem = join('/', $patient_directory, $sample);
 		
@@ -303,6 +379,9 @@ sub main {
 			push @final_outputs, $output_file;
 			}
 
+		print $log "\nFINAL OUTPUT:\n" . join("\n  ", @final_outputs) . "\n";
+		print $log "---\n";
+
 		# should intermediate files be removed
 		# run per patient
 		if ($args{del_intermediates}) {
@@ -339,9 +418,6 @@ sub main {
 					);
 				}
 			}
-
-		print $log "\nFINAL OUTPUT:\n" . join("\n  ", @final_outputs) . "\n";
-		print $log "---\n";
 		}
 
 	# collate results

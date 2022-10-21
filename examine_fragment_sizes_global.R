@@ -56,7 +56,13 @@ results <- rbind(
 		Prop.long = unlist(lapply(tumour.data, function(i) { 
 			length(i[which(i < 320 & i > 250)]) / length(i) } )),
 		Prop.plus = unlist(lapply(tumour.data, function(i) {
-			length(i[which(i >= 320)]) / length(i) } ))
+			length(i[which(i >= 320)]) / length(i) } )),
+		Ratio.short = unlist(lapply(tumour.data, function(i) {
+			length(i[which(i > 90 & i <= 150)]) / 
+			length(i[which(i > 150 & i <= 230)]) } )),
+		Ratio.long = unlist(lapply(tumour.data, function(i) {
+			length(i[which(i > 230 & i <= 320)]) / 
+			length(i[which(i > 150 & i <= 230)]) } ))
 		),
 	data.frame(
 		Sample = names(normal.data),
@@ -68,7 +74,13 @@ results <- rbind(
 		Prop.long = unlist(lapply(normal.data, function(i) { 
 			length(i[which(i < 320 & i > 250)]) / length(i) } )),
 		Prop.plus = unlist(lapply(normal.data, function(i) {
-			length(i[which(i >= 320)]) / length(i) } ))
+			length(i[which(i >= 320)]) / length(i) } )),
+		Ratio.short = unlist(lapply(normal.data, function(i) {
+			length(i[which(i > 90 & i <= 150)]) / 
+			length(i[which(i > 150 & i <= 230)]) } )),
+		Ratio.long = unlist(lapply(normal.data, function(i) {
+			length(i[which(i > 230 & i <= 320)]) / 
+			length(i[which(i > 150 & i <= 230)]) } ))
 		)
 	);
 
@@ -128,6 +140,14 @@ wilcox.test(results[baseline.idx,]$Prop.long, results[normal.idx,]$Prop.long)$p.
 wilcox.test(results[on.trial.idx,]$Prop.long, results[normal.idx,]$Prop.long)$p.value;
 wilcox.test(results[eot.idx,]$Prop.long, results[normal.idx,]$Prop.long)$p.value;
 
+wilcox.test(results[baseline.idx,]$Ratio.short, results[normal.idx,]$Ratio.short)$p.value;
+wilcox.test(results[on.trial.idx,]$Ratio.short, results[normal.idx,]$Ratio.short)$p.value;
+wilcox.test(results[eot.idx,]$Ratio.short, results[normal.idx,]$Ratio.short)$p.value;
+
+wilcox.test(results[baseline.idx,]$Ratio.long, results[normal.idx,]$Ratio.long)$p.value;
+wilcox.test(results[on.trial.idx,]$Ratio.long, results[normal.idx,]$Ratio.long)$p.value;
+wilcox.test(results[eot.idx,]$Ratio.long, results[normal.idx,]$Ratio.long)$p.value;
+
 ### VISUALIZE DATA #################################################################################
 # start with boxplots to compare proportion of short/long between tumour/normal
 create.boxplot(
@@ -141,19 +161,15 @@ create.boxplot(
 	ylab.label = expression('Proportion fragments <150bp'),
 	ylab.cex = 1.5,
 	ylab.axis.padding = 3,
-	xaxis.tck = c(1,0),
-	yaxis.tck = c(1,0),
 	xaxis.cex = 1.2,
 	yaxis.cex = 1.2,
-	xaxis.fontface = 'plain',
-	yaxis.fontface = 'plain',
 	xaxis.lab = gsub('\\.','-',levels(results$Group)),
 	ylimits = c(0.08,0.36),
 	yat = seq(0.1,0.35,0.05),
 	add.text = TRUE,
 	text.labels = c('**','ns','***'),
 	text.x = c(1.5, 2.5, 3.5),
-	text.y = c(0.355,0.345,0.335),
+	text.y = c(0.355,0.346,0.335),
 	text.cex = c(1.2,0.8,1.2),
 	add.rectangle = TRUE,
 	xleft.rectangle = c(1, 1, 1),
@@ -176,12 +192,8 @@ create.boxplot(
 	ylab.label = expression('Proportion fragments 250-320bp'),
 	ylab.cex = 1.5,
 	ylab.axis.padding = 3,
-	xaxis.tck = c(1,0),
-	yaxis.tck = c(1,0),
 	xaxis.cex = 1.2,
 	yaxis.cex = 1.2,
-	xaxis.fontface = 'plain',
-	yaxis.fontface = 'plain',
 	xaxis.lab = gsub('\\.','-',levels(results$Group)),
 	ylimits = c(-0.005,0.14),
 	yat = seq(0,0.12,0.02),
@@ -200,53 +212,66 @@ create.boxplot(
 	filename = generate.filename('EVOLVE_ctDNA','_proportion_250-320_boxplot', 'png')
 	);
 
-# create a stacked barplot to visualize size distribution for each sample (baseline)
-plot.data <- reshape(
-	results[baseline.idx,c('Sample', colnames(results)[grepl('Prop',colnames(results))])],
-	direction = 'long',
-	varying = list(2:5),
-	timevar = 'Group',
-	times = gsub('Prop\\.','',colnames(results)[grepl('Prop',colnames(results))]),
-	v.names = 'Proportion'
-	);
-
-plot.data$Group <- factor(plot.data$Group, levels = c('short','norm','long','plus'));
-plot.data$Patient <- substr(plot.data$Sample, 0, 11);
-
-# make the plot legend (mutation type/consequence)
-bar.legend <- legend.grob(
-	legends = list(
-		legend = list(
-			colours = rev(default.colours(5,'seq.bluepurple')[-1]),
-			labels = rev(c('<150bp','150-250bp','250-320bp','>320bp')),
-			title = 'Fragment Size'
-			)
-		),
-	title.just = 'left',
-	title.fontface = 'plain',
-	title.cex = 1,
-	label.cex = 0.7,
-	size = 1.2
-	);
-
-create.barplot(
-	Proportion ~ Patient,
-	plot.data,
-	groups = plot.data$Group,
-	stack = TRUE,
-	col = default.colours(5,'seq.bluepurple')[-1],
-	xaxis.rot = 90,
+create.boxplot(
+	Ratio.short ~ Group,
+	results,
+	add.stripplot = TRUE,
+	points.cex = 1,
+	points.col = c('grey70','skyblue','seagreen','pink')[match(results$Group, c('normal','baseline','on.trial','EOT'))],
+	xaxis.rot = 45,
 	xlab.label = NULL,
-	ylab.label = 'Proportion',
+	ylab.label = expression('Ratio (short:normal)'),
 	ylab.cex = 1.5,
 	ylab.axis.padding = 3,
-	xaxis.cex = 0.6,
+	xaxis.cex = 1.2,
 	yaxis.cex = 1.2,
-	legend = list(right = list(fun = bar.legend)),
+	xaxis.lab = gsub('\\.','-',levels(results$Group)),
+	ylimits = c(-0.005,0.6),
+	yat = seq(0,0.6,0.1),
+	add.text = TRUE,
+	text.labels = c('***','ns','***'),
+	text.x = c(1.5, 2.5, 3.5),
+	text.y = c(0.58,0.565,0.545),
+	text.cex = c(1.2,0.8,1.2),
+	add.rectangle = TRUE,
+	xleft.rectangle = c(1, 1, 1),
+	xright.rectangle = c(2, 3, 4),
+	ytop.rectangle = c(0.573, 0.555, 0.537),
+	ybottom.rectangle = c(0.572, 0.554, 0.536),
+	col.rectangle = 'black',
 	style = 'Nature',
-	width = 10,
-	height = 4,
-	filename = generate.filename('EVOLVE_ctDNA','_baseline_proportions', 'png')
+	filename = generate.filename('EVOLVE_ctDNA','_ratio_short_boxplot', 'png')
+	);
+
+create.boxplot(
+	Ratio.long ~ Group,
+	results,
+	add.stripplot = TRUE,
+	points.cex = 1,
+	points.col = c('grey70','skyblue','seagreen','pink')[match(results$Group, c('normal','baseline','on.trial','EOT'))],
+	xaxis.rot = 45,
+	xlab.label = NULL,
+	ylab.label = expression('Ratio (long:normal)'),
+	ylab.cex = 1.5,
+	ylab.axis.padding = 3,
+	xaxis.cex = 1.2,
+	yaxis.cex = 1.2,
+	xaxis.lab = gsub('\\.','-',levels(results$Group)),
+	ylimits = c(-0.005,0.3),
+	yat = seq(0,0.3,0.05),
+	add.text = TRUE,
+	text.labels = c('***','***','*'),
+	text.x = c(1.5, 2.5, 3.5),
+	text.y = c(0.29,0.280,0.27),
+	text.cex = 1.2,
+	add.rectangle = TRUE,
+	xleft.rectangle = c(1, 1, 1),
+	xright.rectangle = c(2, 3, 4),
+	ytop.rectangle = c(0.285, 0.275, 0.265),
+	ybottom.rectangle = c(0.284, 0.274, 0.264),
+	col.rectangle = 'black',
+	style = 'Nature',
+	filename = generate.filename('EVOLVE_ctDNA','_ratio_long_boxplot', 'png')
 	);
 
 # group by type

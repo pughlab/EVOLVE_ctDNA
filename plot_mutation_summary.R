@@ -57,6 +57,10 @@ cbio.data <- read.delim('cBioportal/EVOLVE_ctDNA_20220908/mutation_data_extended
 
 # get cnv data (for CCNE1 amplifications)
 cnvkit <- read.delim('CNVKit/cnv_calls_with_purity__ci/2022-09-12_EVOLVE_ctDNA__cnvkit_calls.tsv');
+mops <- read.delim('panelCNmops/sp_v1/2022-10-20_EVOLVE_ctDNA__summarized_CCNE1_calls.tsv');
+
+# get purity estimates
+purity <- read.delim('Ensemble_calls/tumour_content/2022-09-06_EVOLVE_ctDNA__estimated_tumour_content.tsv');
 
 # move to output directory
 setwd(output.dir);
@@ -223,9 +227,9 @@ for (i in 1:nrow(missing.muts)) {
 	}
 
 # indicate reversions
-#dot.data['BRCA1',grepl('EVO-009-001', colnames(dot.data))] <- 2; # somatic snp + somatic DEL
+dot.data['BRCA1',grepl('EVO-009-001', colnames(dot.data))] <- 4; # somatic snp + somatic DEL
 dot.data['BRCA1',grepl('EVO-009-003', colnames(dot.data))] <- 3; # germline snp + somatic snp
-dot.data['BRCA1',grepl('EVO-009-013', colnames(dot.data))] <- 3; # germline snp + somatic indel
+dot.data['BRCA1',grepl('EVO-009-013', colnames(dot.data))] <- 4; # germline snp + somatic indel
 dot.data['BRCA1',grepl('EVO-009-023', colnames(dot.data))] <- 3; # germline snp + somatic indel
 
 plot.data['BRCA2',grepl('EVO-009-006', colnames(plot.data))] <- 6; # triallelic
@@ -235,11 +239,17 @@ dot.data['BRCA2',grepl('EVO-009-006', colnames(dot.data))] <- 4; # triallelic
 plot.data['CCNE1',] <- 0;
 dot.data['CCNE1',] <- 0;
 
-wxs.with.ccne1.amps <- c('EVO-009-002','EVO-009-004','EVO-009-006','EVO-009-007','EVO-009-008','EVO-009-009','EVO-009-011');
+# based on original EVOLVE publication
+wxs.with.ccne1.amps <- c('EVO-009-004','EVO-009-006','EVO-009-007','EVO-009-009','EVO-009-011','EVO-400-007','EVO-400-008');
+#wxs.with.ccne1.amps <- c('EVO-009-002','EVO-009-004','EVO-009-006','EVO-009-007','EVO-009-008','EVO-009-009','EVO-009-011');	# based on OVSuperset
 #ctdna.with.ccne1.amps <- c('EVO-009-004_C2D1','EVO-009-007_C2D1','EVO-009-013_Screening','EVO-009-013_C2D1','EVO-009-017_C2D1','EVO-009-020_C2D1','EVO-009-023_C2D1','EVO-009-024_C2D1','EVO-400-003_C2D1');
 
 # use CNVKit data
-ccne1.amps <- cnvkit[which(cnvkit$gene == 'CCNE1' & cnvkit$cn >= 4),];
+#ccne1.amps <- cnvkit[which(cnvkit$gene == 'CCNE1' & cnvkit$cn >= 4),];
+#ccne1.amps <- cnvkit[which(cnvkit$gene == 'CCNE1' & cnvkit$log2 > 2),];
+# use panelCN.mops data
+ccne1.amps <- mops[which(mops$Call == 1),];
+
 ctdna.with.ccne1.amps <- gsub('_ctDNA','',as.character(ccne1.amps$Sample));
 
 # fill in findings
@@ -257,6 +267,13 @@ dot.data <- dot.data[gene.order,phenodata$Sample];
 
 # fix coding (for heatmap colours)
 #plot.data[which(plot.data == 9, arr.ind = TRUE)] <- 8;
+
+# format purity estimates
+purity$Sample <- gsub('_ctDNA','',purity$Sample);
+purity.estimates <- merge(phenodata[,c('Patient.ID','Sample','ORDER')], purity[,c('Patient.ID','Sample','Final')]);
+
+purity.estimates <- purity.estimates[order(purity.estimates$Patient.ID, purity.estimates$ORDER),];
+purity.estimates$Sample <- factor(purity.estimates$Sample, levels = colnames(plot.data));
 
 ### COVARIATES #####################################################################################
 # make the plot legend (mutation type/consequence)
@@ -417,7 +434,7 @@ patient.splits <- rep('grey90',nrow(covariate.data));
 patient.splits[get.line.breaks(covariate.data$Patient.ID)+0.5] <- 'black';
 
 # make the plot!
-create.dotmap(
+mutation.plot <- create.dotmap(
 	x = dot.data,
 	bg.data = plot.data,
 	spot.size.function = spot.size.vaf,
@@ -452,11 +469,57 @@ create.dotmap(
 	lwd = 1,
 	col.lwd = 1,
 	row.lwd = 1,
-	col.colour = patient.splits,
+	col.colour = patient.splits
+	);
+
+write.plot(
+	mutation.plot,
 	height = 4.4,
 	width = 15,
 	resolution = 1200,
 	filename = generate.filename('EVOLVE_ctDNA', 'SNV_validation_heatmap','png')
+	);
+
+purity.estimates$Estimate <- log10(purity.estimates$Final*1000);
+
+purity.plot <- create.scatterplot(
+	Estimate ~ Sample,
+	purity.estimates,
+	type = c('h','p'),
+	xaxis.lab = rep('',nrow(purity)),
+	xlab.label = NULL,
+	ylab.label = 'ctDNA level',
+	ylab.cex = 1.1,
+	xaxis.tck = 0,
+	ylimits = c(0,3),
+	yat = seq(0,3,1), #log10(c(0.001,0.01,0.1,1)),
+	yaxis.lab = c(0.001,0.01,0.1,1),
+	yaxis.cex = 1,
+	abline.h = c(1,2), # 1% and 10%
+	abline.lty = 2,
+	abline.lwd = 1,
+	abline.col = c('grey50','red'),
+	style = 'Nature'
+	);
+
+create.multipanelplot(
+	plot.objects = list(purity.plot, mutation.plot),
+	plot.objects.heights = c(1,2),
+	plot.objects.widths = 1,
+	layout.height = 2,
+	layout.width = 1,
+	y.spacing = -2,
+	ylab.axis.padding = 0,
+	left.legend.padding = 0,
+	right.legend.padding = 0,
+	top.legend.padding = 0,
+	bottom.legend.padding = 4,
+	top.padding = -1,
+	bottom.padding = 6,
+	height = 6,
+	width = 15,
+	resolution = 1200,
+	filename = generate.filename('EVOLVE_ctDNA', '__figure4','png')
 	);
 
 ### SAVE SESSION INFO ##############################################################################

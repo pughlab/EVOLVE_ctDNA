@@ -15,7 +15,7 @@ setwd(working.dir);
 
 ### READ DATA ######################################################################################
 # find data files
-fragment.sizes <- read.delim('2022-09-07_EVOLVE_ctDNA__fragment_size_and_purity_estimates.tsv');
+fragment.sizes <- read.delim('2022-10-07_EVOLVE_ctDNA__fragment_size_and_purity_estimates.tsv');
 phenodata <- read.delim('../configs/EVOLVE_clinical_data.tsv');
 phenodata <- unique(phenodata[,c(1,8,11,16,17,20,21)]);
 colnames(phenodata) <- c('Patient','Age','Best.Response','DFS.Months','DFS.Status','OS.Months','OS.Status');
@@ -42,30 +42,44 @@ phenodata$OS.Status <- factor(
 
 # format fragment info	
 fragment.sizes <- fragment.sizes[grepl('Screening|C1D1', fragment.sizes$Sample),];
-fragment.sizes$FC <- log2(fragment.sizes$Median.ALT) / log2(fragment.sizes$Median.REF);
 
 # merge mutation and clinical info
 master.matrix <- merge(
 	phenodata,
-	fragment.sizes[,c('Patient','Prop.short','Prop.long','p.value','FC')],
+	fragment.sizes[,c('Patient','Prop.short','Prop.long','Median.FC','p.value','short.ratio')],
 	by = 'Patient'
 	);
 
+metrics <- c('Prop.short','Prop.long','Median.FC','p.value','short.ratio');
+
 ### SURVIVAL #######################################################################################
+# make table to hold results
+results.data <- data.frame(
+	Metric = rep(metrics,2),
+	Stat = rep(c('OS','DFS'), each = length(metrics)),
+	HR = NA,
+	p = NA,
+	CI.high = NA,
+	CI.low = NA
+	);
+
 # loop over each variable
-for (metric in c('Prop.short','Prop.long','p.value','FC')) {
+for (metric in metrics) {
+
+	# start with OS
+	results.idx <- which(results.data$Metric == metric & results.data$Stat == 'OS');
 
 	# organize groups
 	surv.data <- master.matrix[!is.na(master.matrix[,metric]),];
 
 	groups <- rep(0, nrow(surv.data));
 
-	if (grepl('Prop', metric)) {
+	if (grepl('Prop|short', metric)) {
 		groups[which(surv.data[,metric] > median(surv.data[,metric]))] <- 1;
 		labels <- c('low','high');
 		} else if (metric == 'p.value') {
 		groups[which(surv.data[,metric] < 0.05)] <- 1;
-		labels <- c('ns','signif');
+		labels <- c('same','diff');
 		} else {
 		groups[which(surv.data[,metric] < 1)] <- 1;
 		labels <- c('+ve','-ve');
@@ -91,6 +105,10 @@ for (metric in c('Prop.short','Prop.long','p.value','FC')) {
 			groups = groups,
 			survival.object = survobj
 			);
+
+		results.data[results.idx,]$p <- output$pvalue[1];
+		} else {
+		results.data[results.idx,c('HR','CI.low','CI.high','p')] <- as.numeric(parse.cox.table(output)[1,1:4]);
 		}
 
 	# make a km plot
@@ -117,6 +135,9 @@ for (metric in c('Prop.short','Prop.long','p.value','FC')) {
 		style = 'Nature'
 		);
 
+	# DFS
+	results.idx <- which(results.data$Metric == metric & results.data$Stat == 'DFS');
+
 	# collect survival stats
 	survtime <- surv.data$DFS.Months;
 	survstat <- as.numeric(surv.data$DFS.Status);
@@ -137,6 +158,9 @@ for (metric in c('Prop.short','Prop.long','p.value','FC')) {
 			groups = groups,
 			survival.object = survobj
 			);
+		results.data[results.idx,]$p <- output$pvalue[1];
+		} else {
+		results.data[results.idx,c('HR','CI.low','CI.high','p')] <- as.numeric(parse.cox.table(output)[1,1:4]);
 		}
 
 	# make a km plot
@@ -168,6 +192,13 @@ for (metric in c('Prop.short','Prop.long','p.value','FC')) {
 		);
 	}
 
+write.table(
+	results.data,
+	file = generate.filename('EVOLVE_ctDNA','_fragment_size_survival_metrics','tsv'),
+	row.names = FALSE,
+	col.names = TRUE,
+	sep = '\t'
+	);
 
 # organize groups
 surv.data <- master.matrix[!is.na(master.matrix$p.value),];

@@ -1,79 +1,82 @@
 ### plot_cnmops_profile_ccne1.R ####################################################################
 # Use CN calls from panelCNmops to plot CN profile for CCNE1 to identify amplifications
 
-### FUNCTIONS ######################################################################################
-# function to generate a standardized filename
-generate.filename <- function(project.stem, file.core, extension, include.date = TRUE) {
-
-	# build up the filename
-	file.name <- paste(project.stem, file.core, sep = '_');
-	file.name <- paste(file.name, extension, sep = '.');
-
-	if (include.date) {
-		file.name <- paste(Sys.Date(), file.name, sep = '_');
-		}
-
-	return(file.name);
-	}
-
-# function to write session profile to file
-save.session.profile <- function(file.name) {
-
-	# open the file
-	sink(file = file.name, split = FALSE);
-
-	# write memory usage to file
-	cat('### MEMORY USAGE ###############################################################');
-	print(proc.time());
-
-	# write sessionInfo to file
-	cat("\n### SESSION INFO ###############################################################");
-	print(sessionInfo());
-
-	# close the file
-	sink();
-
-	}
-
 ### PREPARE SESSION ################################################################################
 # import libraries
 library(BoutrosLab.plotting.general);
 
-setwd('/cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/panelCNmops');
+source('/cluster/home/sprokope/git/analysis/helper_functions/session.functions.R');
+
+starting.dir <- '/cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite';
+working.dir <- 'panelCNmops/sp_v1';
+
+setwd(starting.dir);
 
 ### READ DATA ######################################################################################
 # get clinical data
-clinical <- read.delim('/cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/configs/2022-05-30_sample_info.txt')[,c('Patient','Sample','Tumor.Type')];
+sample.info <- read.delim('configs/2022-09-06_sample_info_with_batch.txt');
 
-purity <- read.delim('../tumour_content/2022-07-13_EVOLVE_ctDNA_tp53_vafs.tsv');
+# get alternate tool calls
+cnvkit <- read.delim('CNVKit/cnv_calls_with_purity__ci/2022-09-12_EVOLVE_ctDNA__cnvkit_calls.tsv');
+cnvkit <- cnvkit[which(cnvkit$gene == 'CCNE1'),];
 
 # get cn.MOPS output
-#cn.data <- read.delim('2022-07-19_EVOLVE_ctDNA__panelCN.mops_vs_diploid__cna_matrix.tsv');
-#ratio.data <- read.delim('2022-07-19_EVOLVE_ctDNA__panelCN.mops_vs_diploid__ratio_matrix.tsv');
-cn.data.long <- read.delim('2022-07-28_allUNIQUE_cohort_panelcn.mops_results.tsv');
+setwd(working.dir);
+
+cn.data.long <- do.call(rbind, lapply(
+	list.files(pattern = 'cohort_panelcn.mops_results.tsv', recursive = TRUE), read.delim)
+	);
 
 # get cn.MOPS interval annotations
-anno.data <- read.delim('PanelOfNormals/formatted_countWindows.bed');
+anno.data <- read.delim('batch1/PanelOfNormals/formatted_countWindows.bed');
 colnames(anno.data) <- c('Chromosome','Start','End','Name','Gene','Exon');
 
 ### FORMAT DATA ####################################################################################
-# format purity
-#purity <- unique(purity[grepl('allUNIQUE', purity$Sample.ct),c('Patient','Sample','VAF.ct')]);
-#colnames(purity) <- c('Patient','Sample','Purity');
-
 # format CN data
 cn.data.long$CN <- as.numeric(gsub('CN','',as.character(cn.data.long$CN)));
+
+# keep allUNIQUE only
+#cn.data.long <- cn.data.long[grepl('allUNIQUE', cn.data.long$Sample),];
+
+# extract CN calls for CCNE1 only
+cn.data.long <- cn.data.long[which(cn.data.long$Gene == 'CCNE1'),];
+
+# remove duplicate/overlapped region
+cn.data.long <- cn.data.long[which(cn.data.long$Exon != 'CCNE1'),];
+
+# convert lowQual calls to NA
 cn.data.long[which(cn.data.long$lowQual == 'lowQual'),]$CN <- NA;
 
+# summarize CN mops using weighted mean
+weighted.cn <- aggregate(
+	CN ~ Sample,
+	cn.data.long,
+	function(i) {
+		j <- table(i);
+		sum(as.numeric(names(j))*j)/sum(j)
+		}
+	);
+
+weighted.cn$Call <- 0;
+weighted.cn[which(weighted.cn$CN > 2.1),]$Call <- 1;
+
+to.write <- merge(sample.info, weighted.cn);
+
+write.table(
+	to.write,
+	file = generate.filename('EVOLVE_ctDNA', '_summarized_CCNE1_calls','tsv'),
+	row.names = FALSE,
+	col.names = TRUE,
+	sep = '\t'
+	);	
+
+# format data for plotting
 cn.data <- reshape(
 	cn.data.long[,c('Sample','Gene','Chr','Start','End','CN')],
 	direction = 'wide',
 	idvar = c('Chr','Start','End','Gene'),
 	timevar = 'Sample'
 	);
-
-#colnames(cn.data)[3] <- 'Name';
-#colnames(ratio.data)[3] <- 'Name';
 
 cn.data <- merge(
 	anno.data[,-4],
@@ -82,71 +85,47 @@ cn.data <- merge(
 	by.y = c('Chr','Start','End','Gene')
 	);
 
-#cn.data <- cn.data[,-3];
-#cn.data$Chromosome <- factor(cn.data$Chromosome, levels = paste0('chr',c(1:22,'X','Y')));
 cn.data <- cn.data[order(cn.data$Chromosome, cn.data$Start, cn.data$End),];
 
-#ratio.data <- merge(anno.data, ratio.data, all.x = TRUE);
-#ratio.data <- ratio.data[,-3];
-#ratio.data$Chromosome <- factor(ratio.data$Chromosome, levels = paste0('chr',c(1:22,'X','Y')));
-#ratio.data <- ratio.data[order(ratio.data$Chromosome, ratio.data$Start, ratio.data$End),];
-
-# only plot CCNE1 for now
-#plot.cn.data <- cn.data[which(cn.data$Gene == 'CCNE1'),c(1:5, grep('allUNIQUE',colnames(cn.data)))];
-#plot.ratio.data <- ratio.data[which(ratio.data$Gene == 'CCNE1'),colnames(plot.cn.data)];
-
-#colnames(plot.cn.data) <- gsub('_allUNIQUE','',gsub('\\.','-',gsub('_ctDNA','',colnames(plot.cn.data))));
-#colnames(plot.ratio.data) <- colnames(plot.cn.data);
-
-plot.cn.data <- cn.data;
-colnames(plot.cn.data) <- gsub('CN-','',gsub('\\.','-',gsub('_ctDNA','',colnames(plot.cn.data))));
-
-rownames(plot.cn.data) <- paste0(plot.cn.data$Exon, '_', plot.cn.data$Start);
-#rownames(plot.ratio.data) <- paste0(plot.ratio.data$Exon, '_', plot.ratio.data$Start);
+# organize for plotting
+colnames(cn.data) <- gsub('CN-','',gsub('\\.','-',gsub('_ctDNA','',colnames(cn.data))));
+rownames(cn.data) <- paste0(cn.data$Exon, '_', cn.data$Start);
 
 # format clinical for sample ordering
-clinical$Timepoint <- 0;
-clinical[grepl('^C', clinical$Tumor.Type),]$Timepoint <- as.numeric(
-	gsub('^C','',gsub('D1','', clinical[grepl('^C', clinical$Tumor.Type),]$Tumor.Type))
+sample.info$Patient <- as.character(sample.info$Patient);
+sample.info$Sample <- gsub('_ctDNA','',sample.info$Sample);
+sample.info <- sample.info[order(sample.info$Patient, sample.info$Timepoint),];
+
+keep.samples <- intersect(sample.info$Sample, colnames(cn.data));
+
+sample.info <- sample.info[which(sample.info$Sample %in% keep.samples),];
+sample.order <- sample.info$Sample;
+
+plot.cn.data <- data.frame(t(cn.data[,sample.order]));
+
+# indicate where to put lines
+patient.breaks <- get.line.breaks(rev(sample.info$Patient));
+
+# indicate amplified samples
+ccne1.amps <- data.frame(
+	WES = rep(NA, nrow(plot.cn.data)),
+	MOPS = rep(0, nrow(plot.cn.data)),
+	CNVkit = rep(0, nrow(plot.cn.data))
 	);
-clinical[which(clinical$Tumor.Type == 'EOT'),]$Timepoint <- 35;
+rownames(ccne1.amps) <- rownames(plot.cn.data);
 
-clinical <- merge(clinical, purity, all.x = TRUE);
+wxs.with.ccne1.amps <- c('EVO-009-004','EVO-009-006','EVO-009-007','EVO-009-009','EVO-009-011','EVO-400-007','EVO-400-008');
+ccne1.amps[which(rownames(ccne1.amps) %in% sample.info[which(sample.info$Group == 'baseline'),]$Sample),]$WES <- 0;
+ccne1.amps[which(rownames(ccne1.amps) %in% sample.info[which(sample.info$Patient %in% wxs.with.ccne1.amps & sample.info$Group == 'baseline'),]$Sample),]$WES <- 1;
 
-clinical <- unique(clinical[order(clinical$Patient, clinical$Timepoint),]);
+mops.amplified <- gsub('_ctDNA','',weighted.cn[which(weighted.cn$CN > 2.1),]$Sample);
+kit.amplified <- intersect(
+	gsub('_ctDNA','',cnvkit[which(cnvkit$log2 > 2),]$Sample),
+	rownames(ccne1.amps)
+	);
 
-clinical$Sample <- gsub('_ctDNA','',clinical$Sample);
-
-if (any(!clinical$Sample %in% colnames(plot.cn.data))) {
-	clinical <- clinical[which(clinical$Sample %in% colnames(plot.cn.data)),];
-	}
-
-plot.cn.data <- data.frame(t(plot.cn.data[,clinical$Sample]));
-#plot.ratio.data <- data.frame(t(plot.ratio.data[,clinical$Sample]));
-
-# remove mostly duplicated interval
-plot.cn.data <- plot.cn.data[,-1];
-#plot.ratio.data <- plot.ratio.data[,-1];
-
-patient.breaks <- get.line.breaks(rev(clinical$Patient));
-
-# get overall call (20% intervals have a gain)
-overall.cn <- rev(apply(
-	plot.cn.data,
-	1,
-	function(i) {
-		gains <- length(i[which(i > 2)]);
-		losses <- length(i[which(i < 2)]);
-		total <- length(i[!is.na(i)]);
-		if (gains/total > 0.2) { return(2); }
-		else if (losses/total > 0.2) { return(0); }
-		else { return(1); }
-		}
-	));
-
-high.tc <- rep(0, nrow(clinical));
-high.tc[which(clinical$Purity > 0.05)] <- 1;
-high.tc <- rev(high.tc);
+ccne1.amps[mops.amplified,]$MOPS <- 1;
+ccne1.amps[kit.amplified,]$CNVkit <- 1;
 
 # create heatmap
 create.heatmap(
@@ -156,14 +135,8 @@ create.heatmap(
 	covariates = list(
 		rect = list(
 			col = 'black',
-			#fill = c('blue','#CEB1FF','white','#FF9E81','red')[match(overall.cn, c(0,1,2,3,4))],
-			fill = c('blue','white','red')[match(overall.cn, c(0,1,2))],
+			fill = rev(c('white','red')[match(ccne1.amps$MOPS, c(0,1))]),
 			lwd = 0
-#			),
-#		rect = list(
-#			col = 'black',
-#			fill = c('white','black')[match(high.tc, c(0,1))],
-#			lwd = 0
 			)
 		),
 	covariates.grid.border = list(col = 'black', lwd = 1),
@@ -199,8 +172,9 @@ create.heatmap(
 	filename = generate.filename('EVOLVE_ctDNA', 'panel_cna_landscape','png')
 	);
 
-create.heatmap(
-	plot.ratio.data,
+# add CNVkit calls for comparison
+per.exon <- create.heatmap(
+	plot.cn.data-2,
 	cluster.dimensions = 'none',
 	same.as.matrix = TRUE,
 	yaxis.lab = NA,
@@ -209,7 +183,7 @@ create.heatmap(
 	xaxis.cex = 0.6,
 	xaxis.tck = 0,
 	yaxis.tck = 0,
-	xlab.label = expression('CCNE1 Exon Copy-Number (log'['2']*'ratio)'),
+	xlab.label = expression('CCNE1 Exon Copy-Number'),
 	xlab.cex = 1,
 	axis.xlab.padding = 1,
 	xaxis.fontface = 'plain',
@@ -221,13 +195,52 @@ create.heatmap(
 	row.lines = patient.breaks,
 	print.colour.key = TRUE,
 	fill.colour = 'grey80',
-	at = seq(-2,2,0.1),
+	at = seq(-2.5,2.5,1), # } else { seq(-2,2,0.1) },
 	colour.scheme = c('blue','white','red'),
-	colourkey.labels.at = seq(-2,2,1),
-	colourkey.labels = seq(-2,2,1),
-	colourkey.cex = 1,
+	colourkey.labels.at = seq(-2,2,1), # } else { seq(-2,2,1) },
+	colourkey.labels = seq(-2,2,1), # } else { seq(-2,2,1) },
+	colourkey.cex = 1
+	);
+
+summarized.plot <- create.heatmap(
+	ccne1.amps,
+	cluster.dimensions = 'none',
+	same.as.matrix = TRUE,
+	yaxis.lab = NULL,
+	xaxis.lab = c('WES','panelCN.mops','CNVkit'),
+	xaxis.cex = 0.6,
+	xaxis.tck = 0,
+	yaxis.tck = 0,
+	xlab.label = '',
+	xaxis.fontface = 'plain',
+	axes.lwd = 1,
+	row.colour = 'black',
+	grid.row = TRUE,
+	grid.col = TRUE,
+	force.grid.row = TRUE,
+	force.grid.col = TRUE,
+	row.lines = patient.breaks,
+	print.colour.key = FALSE,
+	colour.scheme = c('white','red')
+	);
+
+create.multipanelplot(
+	plot.objects = list(per.exon, summarized.plot),
+	plot.objects.heights = 1,
+	plot.objects.widths = c(7,1),
+	layout.height = 1,
+	layout.width = 2,
+	x.spacing = 2,
+	left.legend.padding = 1,
+	right.legend.padding = 1,
+	top.legend.padding = 0,
+	bottom.legend.padding = 0,
+	xlab.axis.padding = 3,
 	height = 11,
 	width = 8,
-	resolution = 400,
-	filename = generate.filename('EVOLVE_ctDNA', 'panel_cna_ratio_landscape','png')
+	resolution = 800,
+	filename = generate.filename('EVOLVE_ctDNA', 'panel_cna_landscape_summarized','png')
 	);
+
+### SAVE SESSION INFO ##############################################################################
+save.session.profile(generate.filename('SummarizeMOPS','SessionProfile','txt'));

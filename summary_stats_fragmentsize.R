@@ -1,5 +1,5 @@
 ### summary_statistics.R ##########################################################################
-# Perform survival statistics on clearance + clinical features
+# Perform survival statistics on fragment size + clinical features
 
 ### PREPARE SESSION ################################################################################
 # import libraries
@@ -7,48 +7,72 @@ library(BoutrosLab.plotting.general);
 
 source('/cluster/home/sprokope/git/analysis/helper_functions/session.functions.R');
 
-working.dir <- '/cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/Ensemble_calls/tumour_content';
+working.dir <- '/cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/fragment_size';
 
 setwd(working.dir);
 
 ### READ DATA ######################################################################################
 # find data files
-load('../../2022-09-06_EVOLVE_ctDNA_clinicalCovariates.RData');
+load('../2022-09-06_EVOLVE_ctDNA_clinicalCovariates.RData');
 
-vaf.data <- read.delim('2022-09-06_EVOLVE_ctDNA__estimated_tumour_content.tsv');
+# get timeline info
+timeline <- read.delim('../configs/2022-09-06_sample_info_with_batch.txt');
+
+# get fragment size data
+ratio.data <- read.delim('2022-10-06_EVOLVE_ctDNA_fragment_size_summary.tsv');
+ratio.data <- ratio.data[!grepl('TGL',ratio.data$Sample),];
+ratio.data$Patient <- substr(ratio.data$Sample, 0, 11);
 
 ### FORMAT DATA ####################################################################################
-# format data
-vaf.reshaped <- reshape(
-	vaf.data[,c('Patient.ID','Group.ctdna','Final')],
-	direction = 'wide',
-	timevar = 'Group.ctdna',
-	idvar = 'Patient.ID'
-	);
-colnames(vaf.reshaped) <- gsub('Final\\.','',colnames(vaf.reshaped));
+# calculate change in fragment ratio between cycles
+short.reshaped <- reshape(
+        ratio.data[,c('Patient','Group','Ratio.short')],
+        direction = 'wide',
+        timevar = 'Group',
+        idvar = 'Patient'
+        );
+colnames(short.reshaped) <- gsub('Ratio\\.short\\.','',colnames(short.reshaped));
+
+long.reshaped <- reshape(
+        ratio.data[,c('Patient','Group','Ratio.long')],
+        direction = 'wide',
+        timevar = 'Group',
+        idvar = 'Patient'
+        );
+colnames(long.reshaped) <- gsub('Ratio\\.long\\.','',colnames(long.reshaped));
 
 # calculate clearance
-vaf.reshaped$delta <- apply(
-	vaf.reshaped[,c('baseline','on.trial','EOT')],
-	1,
-	function(i) {
-		i <- na.omit(i);
-		if (length(i) < 2) { return(NA) } else { return( 100* ( (i[2]-i[1]) / i[1]) ) }
-		}
-	);
+short.reshaped$delta <- apply(
+        short.reshaped[,c('baseline','on.trial','EOT')],
+        1,
+        function(i) {
+                i <- na.omit(i);
+                if (length(i) < 2) { return(NA) } else { return( 100* ( (i[2]-i[1]) / i[1]) ) }
+                }
+        );
+
+long.reshaped$delta <- apply(
+        long.reshaped[,c('baseline','on.trial','EOT')],
+        1,
+        function(i) {
+                i <- na.omit(i);
+                if (length(i) < 2) { return(NA) } else { return( 100* ( (i[2]-i[1]) / i[1]) ) }
+                }
+        );
 
 # merge mutation and clinical info
 master.matrix <- merge(
 	clinical,
-	vaf.reshaped,
-	by = 'Patient.ID'
+	merge(short.reshaped,long.reshaped,by = 'Patient', suffixes = c('.short','.long')),
+	by.x = 'Patient.ID',
+	by.y = 'Patient'
 	);
 
 master.matrix[,c('delta.cycles','N.cycles')] <- 0;
 for (i in 1:nrow(master.matrix)) {
 	patient <- as.character(master.matrix[i,]$Patient.ID);
-	master.matrix[i,]$delta.cycles <- sort(vaf.data[which(vaf.data$Patient == patient),]$Timepoint)[2];
-	master.matrix[i,]$N.cycles <- max(vaf.data[which(vaf.data$Patient == patient),]$Timepoint);
+	master.matrix[i,]$delta.cycles <- sort(timeline[which(timeline$Patient == patient),]$Timepoint)[2];
+	master.matrix[i,]$N.cycles <- max(timeline[which(timeline$Patient == patient),]$Timepoint);
 	}
 
 master.matrix$Best.Response <- factor(

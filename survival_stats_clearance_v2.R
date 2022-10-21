@@ -17,8 +17,8 @@ setwd(working.dir);
 # find data files
 clearance.data <- read.delim('2022-09-06_EVOLVE_ctDNA_tumourClearance_data.tsv');
 phenodata <- read.delim('../../configs/EVOLVE_clinical_data.tsv');
-phenodata <- unique(phenodata[,c(1,8,11,16,17,20,21)]);
-colnames(phenodata) <- c('Patient','Age','Best.Response','DFS.Months','DFS.Status','OS.Months','OS.Status');
+phenodata <- unique(phenodata[,c(1,8,11,13,16,17,20,21)]);
+colnames(phenodata) <- c('Patient','Age','Best.Response','Cohort','DFS.Months','DFS.Status','OS.Months','OS.Status');
 
 ### FORMAT DATA ####################################################################################
 # format clinical info
@@ -53,7 +53,7 @@ master.matrix <- merge(
 surv.data <- master.matrix[!is.na(master.matrix$delta),];
 
 groups <- rep(0, nrow(surv.data));
-groups[which(surv.data$delta > 0)] <- 1;
+groups[which(surv.data$delta > -10)] <- 1;
 
 # collect survival stats
 survtime <- surv.data$OS.Months;
@@ -63,8 +63,7 @@ survobj <- Surv(survtime, survstat);
 output <- fit.coxmodel(
 	groups = groups,
 	survobj = survobj,
-#	other.data = tmp.data[,key.clinical], # if length(key.clinical) > 1
-#	other.data = matrix(as.numeric(master.matrix$Age)),
+#	other.data = surv.data[,c('Cohort','Age')],
 	return.cox.model = TRUE
 	);
 
@@ -109,8 +108,7 @@ survobj <- Surv(survtime, survstat);
 output <- fit.coxmodel(
 	groups = groups,
 	survobj = survobj,
-#	other.data = tmp.data[,key.clinical], # if length(key.clinical) > 1
-#	other.data = matrix(master.matrix$Age),
+#	other.data = surv.data[,c('Cohort','Age')],
 	return.cox.model = TRUE
 	);
 

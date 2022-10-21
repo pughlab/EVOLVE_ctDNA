@@ -272,6 +272,21 @@ for (patient in all.patients) {
 sensitivity.results$per.patient <- results;
 
 ### VISUALIZE DATA #################################################################################
+perpanel.plot <- function(data, label) {
+	create.boxplot(
+		Score ~ Tool | label,
+		data,
+		add.stripplot = TRUE,
+		points.alpha = 0.5,
+		add.text = TRUE,
+		text.labels = rep('\u2015',length(unique(data$Tool))),
+		text.x = 1:length(unique(data$Tool)),
+		text.y = aggregate(Score ~ Tool, data, mean)$Score,
+		text.cex = 1,
+		text.col = 'red'
+		);
+	}
+
 # make some boxplots
 plot.objects <- list();
 
@@ -282,34 +297,25 @@ plot.layout.skip <- rep(TRUE, 15);
 plot.data <- reshape(sensitivity.results$per.bam, direction = 'long', varying = list(2:9), v.names = 'Score', timevar = 'Tool', times = colnames(sensitivity.results$per.bam)[2:9]);
 plot.data$Tool <- factor(plot.data$Tool, levels = plot.order);
 
-plot.objects[[1]] <- create.boxplot(
-	Score ~ Tool | 'BAM',
+plot.objects[[1]] <- perpanel.plot(
 	plot.data,
-	add.stripplot = TRUE,
-	points.alpha = 0.5,
-	add.text = TRUE,
-	text.labels = rep('\u2015',7),
-	text.x = 1:8,
-	text.y = sort(apply(sensitivity.results$per.bam[,-1],2,mean,na.rm = T)),
-	text.cex = 1,
-	text.col = 'red'
+	'BAM'
 	);
-
-plot.objects[[2]] <- create.boxplot(
-	Score ~ Tool | 'allUNIQUE',
-	plot.data[grepl('allUNIQUE', plot.data$BAM),]
+plot.objects[[2]] <- perpanel.plot(
+	plot.data[grepl('allUNIQUE', plot.data$BAM),],
+	'allUNIQUE'
 	);
-plot.objects[[3]] <- create.boxplot(
-	Score ~ Tool | 'DCS',
-	plot.data[grepl('DCS', plot.data$BAM) & !grepl('SSCS', plot.data$BAM),]
+plot.objects[[3]] <- perpanel.plot(
+	plot.data[grepl('DCS', plot.data$BAM) & !grepl('SSCS', plot.data$BAM),],
+	'DCS'
 	);
-plot.objects[[4]] <- create.boxplot(
-	Score ~ Tool | 'DCS+SSCS',
-	plot.data[grepl('DCS', plot.data$BAM) & grepl('SSCS', plot.data$BAM),]
+plot.objects[[4]] <- perpanel.plot(
+	plot.data[grepl('DCS', plot.data$BAM) & grepl('SSCS', plot.data$BAM),],
+	'DCS+SSCS'
 	);
-plot.objects[[5]] <- create.boxplot(
-	Score ~ Tool | 'SSCS',
-	plot.data[!grepl('DCS', plot.data$BAM) & grepl('SSCS', plot.data$BAM),]
+plot.objects[[5]] <- perpanel.plot(
+	plot.data[!grepl('DCS', plot.data$BAM) & grepl('SSCS', plot.data$BAM),],
+	'SSCS'
 	);
 
 plot.layout.skip[1:5] <- FALSE;
@@ -318,50 +324,32 @@ plot.layout.skip[1:5] <- FALSE;
 plot.data <- reshape(sensitivity.results$per.sample, direction = 'long', varying = list(2:9), v.names = 'Score', timevar = 'Tool', times = colnames(sensitivity.results$per.sample)[2:9]);
 plot.data$Tool <- factor(plot.data$Tool, levels = plot.order);
 
-plot.objects[[6]] <- create.boxplot(
-	Score ~ Tool | 'Sample',
+plot.objects[[6]] <- perpanel.plot(
 	plot.data,
-	add.stripplot = TRUE,
-	points.alpha = 0.5,
-	add.text = TRUE,
-	text.labels = rep('\u2015',7),
-	text.x = 1:8,
-	text.y = sort(apply(sensitivity.results$per.sample[,-1],2,mean,na.rm = T)),
-	text.cex = 1,
-	text.col = 'red'
+	'Sample'
 	);
-
-plot.objects[[7]] <- create.boxplot(
-	Score ~ Tool | 'baseline',
-	plot.data[which(plot.data$SAMPLE %in% timeline[which(timeline$Group == 'baseline'),]$Sample),]
+plot.objects[[7]] <- perpanel.plot(
+	plot.data[which(plot.data$SAMPLE %in% timeline[which(timeline$Group == 'baseline'),]$Sample),],
+	'baseline'
 	);
-plot.objects[[8]] <- create.boxplot(
-	Score ~ Tool | 'cycle2',
-	plot.data[which(plot.data$SAMPLE %in% timeline[which(timeline$Group == 'on.trial'),]$Sample),]
+plot.objects[[8]] <- perpanel.plot(
+	plot.data[which(plot.data$SAMPLE %in% timeline[which(timeline$Group == 'on.trial'),]$Sample),],
+	'on-trial'
 	);
-plot.objects[[9]] <- create.boxplot(
-	Score ~ Tool | 'EOT',
-	plot.data[which(plot.data$SAMPLE %in% timeline[which(timeline$Group == 'EOT'),]$Sample),]
+plot.objects[[9]] <- perpanel.plot(
+	plot.data[which(plot.data$SAMPLE %in% timeline[which(timeline$Group == 'EOT'),]$Sample),],
+	'EOT'
 	);
 
 plot.layout.skip[6:9] <- FALSE;
-
 
 # per-patient
 plot.data <- reshape(sensitivity.results$per.patient, direction = 'long', varying = list(2:9), v.names = 'Score', timevar = 'Tool', times = colnames(sensitivity.results$per.patient)[2:9]);
 plot.data$Tool <- factor(plot.data$Tool, levels = plot.order);
 
-plot.objects[[10]] <- create.boxplot(
-	Score ~ Tool | 'Patient',
+plot.objects[[10]] <- perpanel.plot(
 	plot.data,
-	add.stripplot = TRUE,
-	points.alpha = 0.5,
-	add.text = TRUE,
-	text.labels = rep('\u2015',7),
-	text.x = 1:8,
-	text.y = sort(apply(sensitivity.results$per.patient[,-1],2,mean,na.rm = T)),
-	text.cex = 1,
-	text.col = 'red'
+	'Patient'
 	);
 
 plot.layout.skip[11] <- FALSE;
@@ -451,9 +439,9 @@ for (i in 1:nrow(overlap.data)) {
 	}
 
 # indicate cases with no data
-overlap.data[which(overlap.data$Patient %in% c('EVO-009-026','EVO-400-008')),]$baseline <- NA;
-overlap.data[which(overlap.data$Patient %in% c('EVO-009-001','EVO-009-008','EVO-009-012','EVO-009-016','EVO-009-021','EVO-009-022','EVO-400-004','EVO-400-007')),]$cycle2 <- NA;
-overlap.data[which(overlap.data$Patient %in% c('EVO-009-026','EVO-400-008')),]$eot <- NA;
+overlap.data[which(!overlap.data$Patient %in% timeline[which(timeline$Group == 'baseline'),]$Patient),]$baseline <- NA;
+overlap.data[which(!overlap.data$Patient %in% timeline[which(timeline$Group == 'on.trial'),]$Patient),]$cycle2 <- NA;
+overlap.data[which(!overlap.data$Patient %in% timeline[which(timeline$Group == 'EOT'),]$Patient),]$eot <- NA;
 
 write.table(
 	overlap.data,
