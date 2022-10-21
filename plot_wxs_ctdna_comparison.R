@@ -89,7 +89,7 @@ evolve.gr <- makeGRangesFromDataFrame(
 cbio.filtered <- data.frame(subsetByOverlaps(evolve.gr, target.gr));
 colnames(cbio.filtered)[1:3] <- c('Chromosome','Start_Position','End_Position');
 
-key.fields <- c('Patient','Tumor_Sample_Barcode','Hugo_Symbol','Chromosome','Start_Position','End_Position','Variant_Classification','Variant_Type','HGVSc','HGVSp','HGVSp_Short','t_depth','t_ref_count','t_alt_count','n_depth','n_ref_count','n_alt_count');
+key.fields <- c('Patient','Tumor_Sample_Barcode','Hugo_Symbol','Chromosome','Start_Position','End_Position','Variant_Classification','Variant_Type','Mutation_Status','HGVSc','HGVSp','HGVSp_Short','t_depth','t_ref_count','t_alt_count','n_depth','n_ref_count','n_alt_count');
 
 # filter a few synonymous/intronic variants
 cbio.filtered <- cbio.filtered[which(cbio.filtered$Consequence != 'synonymous_variant'),];
@@ -104,8 +104,8 @@ ctdna.smps <- which(is.na(cbio.filtered$Matched_Norm_Sample_Barcode));
 
 merged <- merge(
 	cbio.filtered[exome.smps,key.fields],
-	cbio.filtered[ctdna.smps,key.fields[1:14]],
-	by = c('Patient','Hugo_Symbol','Chromosome','Start_Position','End_Position','Variant_Classification','Variant_Type','HGVSc','HGVSp','HGVSp_Short'),
+	cbio.filtered[ctdna.smps,key.fields[1:15]],
+	by = c('Patient','Hugo_Symbol','Chromosome','Start_Position','End_Position','Variant_Classification','Variant_Type','Mutation_Status','HGVSc','HGVSp','HGVSp_Short'),
 	suffixes = c('.wxs','.ctdna'),
 	all = TRUE
 	);
@@ -114,20 +114,11 @@ merged <- merge(
 merged$t_vaf.wxs <- merged$t_alt_count.wxs / merged$t_depth.wxs
 merged$t_vaf.ctdna <- merged$t_alt_count.ctdna / merged$t_depth.ctdna
 
-###
-df <- merged[,c('Hugo_Symbol','HGVSp_Short','Tumor_Sample_Barcode.wxs','Tumor_Sample_Barcode.ctdna','t_vaf.wxs','t_vaf.ctdna')];
-colnames(df) <- c('Gene','HGVSp','WXS','ctDNA','VAF.wxs','VAF.ct')
-
-df$ctDNA <- gsub('_ctDNA','',df$ctDNA)
-df$VAF.wxs <- round(df$VAF.wxs,3)
-df$VAF.ct <- round(df$VAF.ct,3)
-###
-
 # apply variant coding
 merged$Code <- variant.codes$Code[match(merged$Variant_Classification, variant.codes$Classification)];
 
 # for the purposes of this plot, only include WXS mutations
-merged <- merged[!is.na(merged$Tumor_Sample_Barcode.wxs),];
+#merged <- merged[!is.na(merged$Tumor_Sample_Barcode.wxs),];
 merged <- merged[order(merged$Patient, merged$Hugo_Symbol, -merged$t_vaf.wxs),];
 
 to.remove <- intersect(
@@ -140,7 +131,7 @@ if (length(to.remove) > 0) {
 	}
 
 # and only targeted genes
-merged <- merged[which(merged$Hugo_Symbol %in% c('TP53','BRCA1','CCNE1')),];
+merged <- merged[which(merged$Hugo_Symbol %in% c('TP53','BRCA1','BRCA2','PALB2','CCNE1')),];
 
 # fix sample names
 merged$Tumor_Sample_Barcode.ctdna <- gsub('_ctDNA','',merged$Tumor_Sample_Barcode.ctdna);
@@ -171,14 +162,57 @@ functional.legend <- legend.grob(
 	);
 
 # format plot data
+for (patient in all.patients) {
+
+	# extract exome variants
+	wxs <- reshape(
+		droplevels(unique(merged[grepl(patient, merged$Tumor_Sample_Barcode.wxs),c('Hugo_Symbol','HGVSc','Tumor_Sample_Barcode.wxs','Code')])),
+		direction = 'wide',
+		timevar = 'Tumor_Sample_Barcode.wxs',
+		idvar = c('Hugo_Symbol','HGVSc')
+		);
+
+	# extract ctDNA variants
+	ctdna <- reshape(
+		droplevels(unique(merged[grepl(patient, merged$Tumor_Sample_Barcode.ctdna),c('Hugo_Symbol','HGVSc','Tumor_Sample_Barcode.ctdna','Code')])),
+		direction = 'wide',
+		timevar = 'Tumor_Sample_Barcode.ctdna',
+		idvar = c('Hugo_Symbol','HGVSc')
+		);
+
+	# combine
+	combined <- merge(wxs,ctdna,all = TRUE);
+
+	keep.fields <- colnames(combined);
+	keep.fields[2] <- 'Order';
+
+	# sort
+	combined$Count <- apply(
+		combined[,grepl('Code',colnames(combined))],1,function(i) {
+			length(i[!is.na(i)])
+			}
+		);
+	combined <- combined[order(combined$Count, decreasing = TRUE),];
+	
+	# relabel
+	combined$Order <- NA;
+	for (gene in unique(combined$Hugo_Symbol)) {
+		combined[which(combined$Hugo_Symbol == gene),]$Order <- 1:nrow(combined[which(combined$Hugo_Symbol == gene),]);
+		}
+
+	combined[,keep.fields]
+
+	}
+
+# format plot data
 plot.data <- merge(
 	reshape(
-		unique(merged[,c('Hugo_Symbol','Tumor_Sample_Barcode.wxs','Code')]),
-		direction = 'wide', timevar = 'Tumor_Sample_Barcode.wxs', idvar = 'Hugo_Symbol'),
+		unique(merged[!is.na(merged$Tumor_Sample_Barcode.wxs),c('Hugo_Symbol','HGVSc','Tumor_Sample_Barcode.wxs','Code')]),
+		direction = 'wide', timevar = 'Tumor_Sample_Barcode.wxs', idvar = c('Hugo_Symbol','HGVSc')),
 	reshape(
-		unique(merged[!is.na(merged$Tumor_Sample_Barcode.ctdna),c('Hugo_Symbol','Tumor_Sample_Barcode.ctdna','Code')]),
-		direction = 'wide', timevar = 'Tumor_Sample_Barcode.ctdna', idvar = 'Hugo_Symbol'),
-	by = 'Hugo_Symbol',
+		unique(merged[!is.na(merged$Tumor_Sample_Barcode.ctdna),c('Hugo_Symbol','HGVSc','Tumor_Sample_Barcode.ctdna','Code')]),
+		direction = 'wide', timevar = 'Tumor_Sample_Barcode.ctdna', idvar = c('Hugo_Symbol','HGVSc')),
+	by = c('Hugo_Symbol','HGVSc'),
 	all = TRUE
 	);
 

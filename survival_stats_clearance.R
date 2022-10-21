@@ -9,12 +9,16 @@ library(survival);
 source('/cluster/home/sprokope/git/analysis/helper_functions/session.functions.R');
 source('/cluster/home/sprokope/git/analysis/helper_functions/survival.functions.R');
 
+working.dir <- '/cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/Ensemble_calls/tumour_content';
+
+setwd(working.dir);
+
 ### READ DATA ######################################################################################
 # find data files
-clearance.data <- read.delim('2022-07-13_EVOLVE_ctDNA_tumour_clearance_plotData.tsv');
-phenodata <- read.delim('../configs/EVOLVE_clinical_data.tsv');
-phenodata <- unique(phenodata[,c(1,8,11,16,17,20,21)]);
-colnames(phenodata) <- c('Patient','Age','Best.Response','DFS.Months','DFS.Status','OS.Months','OS.Status');
+clearance.data <- read.delim('2022-09-06_EVOLVE_ctDNA_tumourClearance_data.tsv');
+phenodata <- read.delim('../../configs/EVOLVE_clinical_data.tsv');
+phenodata <- unique(phenodata[,c(1,8,11,13,16,17,20,21)]);
+colnames(phenodata) <- c('Patient','Age','Best.Response','Cohort','DFS.Months','DFS.Status','OS.Months','OS.Status');
 
 ### FORMAT DATA ####################################################################################
 # format clinical info
@@ -37,41 +41,29 @@ phenodata$OS.Status <- factor(
 	);
 
 # merge mutation and clinical info
-clearance.data[which(clearance.data$delta == 0),]$delta <- NA;
-
 master.matrix <- merge(
 	phenodata,
-	clearance.data[!is.na(clearance.data$delta),c('Patient','delta')],
-	by = 'Patient'
+	clearance.data[,c('Patient.ID','delta','N.cycles')],
+	by.x = 'Patient',
+	by.y = 'Patient.ID'
 	);
-
-master.matrix$N.cycles <- 0;
-for (i in 1:nrow(master.matrix)) {
-	patient <- as.character(master.matrix[i,]$Patient);
-	tmp <- clearance.data[which(clearance.data$Patient == patient),];
-	tmp <- tmp[,grepl('VAF.ct',colnames(tmp))];
-	cycle <- sub('D1','',sub('VAF.ct.','',rev(colnames(tmp)[!is.na(tmp)])[1]));
-	if ('Screening' == cycle) { master.matrix[i,]$N.cycles <- 0;
-		} else if ('EOT' == cycle) { master.matrix[i,]$N.cycles <- NA;
-		} else { master.matrix[i,]$N.cycles <- as.numeric(sub('^C','', cycle)); 
-		}
-	}
 
 ### SURVIVAL #######################################################################################
 # organize groups
-groups <- rep(0, nrow(master.matrix));
-groups[which(master.matrix$delta > 0)] <- 1;
+surv.data <- master.matrix[!is.na(master.matrix$delta),];
+
+groups <- rep(0, nrow(surv.data));
+groups[which(surv.data$delta > -10)] <- 1;
 
 # collect survival stats
-survtime <- master.matrix$OS.Months;
-survstat <- as.numeric(master.matrix$OS.Status);
+survtime <- surv.data$OS.Months;
+survstat <- as.numeric(surv.data$OS.Status);
 survobj <- Surv(survtime, survstat);
 
 output <- fit.coxmodel(
 	groups = groups,
 	survobj = survobj,
-#	other.data = tmp.data[,key.clinical], # if length(key.clinical) > 1
-#	other.data = matrix(as.numeric(master.matrix$Age)),
+#	other.data = surv.data[,c('Cohort','Age')],
 	return.cox.model = TRUE
 	);
 
@@ -109,15 +101,14 @@ create.km.plot(
 	);
 
 # collect survival stats
-survtime <- master.matrix$DFS.Months;
-survstat <- as.numeric(master.matrix$DFS.Status);
+survtime <- surv.data$DFS.Months;
+survstat <- as.numeric(surv.data$DFS.Status);
 survobj <- Surv(survtime, survstat);
 
 output <- fit.coxmodel(
 	groups = groups,
 	survobj = survobj,
-#	other.data = tmp.data[,key.clinical], # if length(key.clinical) > 1
-#	other.data = matrix(master.matrix$Age),
+#	other.data = surv.data[,c('Cohort','Age')],
 	return.cox.model = TRUE
 	);
 
@@ -197,7 +188,7 @@ create.km.plot(
 	yaxis.cex = 1.5,
 	xaxis.cex = 1.5,
 	risk.labels = c('low','high'),
-	key.groups.labels = c('low','high'),
+	key.groups.labels = c(paste0('\u2264','3 cycles'),'>3 cycles'),
 	key.groups.cex = 1.5,
 	key.stats.corner = c(1,1),
 	key.stats.x.pos = 1,
@@ -244,7 +235,7 @@ create.km.plot(
 	xaxis.cex = 1.5,
 	line.colours = c('turquoise3','violetred3'),
 	risk.labels = c('low','high'),
-	key.groups.labels = c('low','high'),
+	key.groups.labels = c(paste0('\u2264','3 cycles'),'>3 cycles'),
 	key.groups.cex = 1.5,
 	key.stats.corner = c(1,1),
 	key.stats.x.pos = 1,
