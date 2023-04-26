@@ -8,17 +8,14 @@ library(BoutrosLab.plotting.general);
 source('/cluster/home/sprokope/git/analysis/helper_functions/session.functions.R');
 
 starting.dir <- '/cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite';
-working.dir <- 'panelCNmops/sp_v1';
+#working.dir <- 'panelCNmops/sp_v1';
+working.dir <- '/cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/version2/panelCNmops';
 
 setwd(starting.dir);
 
 ### READ DATA ######################################################################################
 # get clinical data
 sample.info <- read.delim('configs/2022-09-06_sample_info_with_batch.txt');
-
-# get alternate tool calls
-cnvkit <- read.delim('CNVKit/cnv_calls_with_purity__ci/2022-09-12_EVOLVE_ctDNA__cnvkit_calls.tsv');
-cnvkit <- cnvkit[which(cnvkit$gene == 'CCNE1'),];
 
 # get cn.MOPS output
 setwd(working.dir);
@@ -34,9 +31,6 @@ colnames(anno.data) <- c('Chromosome','Start','End','Name','Gene','Exon');
 ### FORMAT DATA ####################################################################################
 # format CN data
 cn.data.long$CN <- as.numeric(gsub('CN','',as.character(cn.data.long$CN)));
-
-# keep allUNIQUE only
-#cn.data.long <- cn.data.long[grepl('allUNIQUE', cn.data.long$Sample),];
 
 # extract CN calls for CCNE1 only
 cn.data.long <- cn.data.long[which(cn.data.long$Gene == 'CCNE1'),];
@@ -58,7 +52,7 @@ weighted.cn <- aggregate(
 	);
 
 weighted.cn$Call <- 0;
-weighted.cn[which(weighted.cn$CN > 2.1),]$Call <- 1;
+weighted.cn[which(weighted.cn$CN > 2.05),]$Call <- 1;
 
 to.write <- merge(sample.info, weighted.cn);
 
@@ -109,8 +103,7 @@ patient.breaks <- get.line.breaks(rev(sample.info$Patient));
 # indicate amplified samples
 ccne1.amps <- data.frame(
 	WES = rep(NA, nrow(plot.cn.data)),
-	MOPS = rep(0, nrow(plot.cn.data)),
-	CNVkit = rep(0, nrow(plot.cn.data))
+	MOPS = rep(0, nrow(plot.cn.data))
 	);
 rownames(ccne1.amps) <- rownames(plot.cn.data);
 
@@ -118,14 +111,8 @@ wxs.with.ccne1.amps <- c('EVO-009-004','EVO-009-006','EVO-009-007','EVO-009-009'
 ccne1.amps[which(rownames(ccne1.amps) %in% sample.info[which(sample.info$Group == 'baseline'),]$Sample),]$WES <- 0;
 ccne1.amps[which(rownames(ccne1.amps) %in% sample.info[which(sample.info$Patient %in% wxs.with.ccne1.amps & sample.info$Group == 'baseline'),]$Sample),]$WES <- 1;
 
-mops.amplified <- gsub('_ctDNA','',weighted.cn[which(weighted.cn$CN > 2.1),]$Sample);
-kit.amplified <- intersect(
-	gsub('_ctDNA','',cnvkit[which(cnvkit$log2 > 2),]$Sample),
-	rownames(ccne1.amps)
-	);
-
+mops.amplified <- gsub('_ctDNA','',weighted.cn[which(weighted.cn$CN > 2.05),]$Sample);
 ccne1.amps[mops.amplified,]$MOPS <- 1;
-ccne1.amps[kit.amplified,]$CNVkit <- 1;
 
 # create heatmap
 create.heatmap(
@@ -172,7 +159,7 @@ create.heatmap(
 	filename = generate.filename('EVOLVE_ctDNA', 'panel_cna_landscape','png')
 	);
 
-# add CNVkit calls for comparison
+# add WES calls for comparison
 per.exon <- create.heatmap(
 	plot.cn.data-2,
 	cluster.dimensions = 'none',
@@ -207,7 +194,7 @@ summarized.plot <- create.heatmap(
 	cluster.dimensions = 'none',
 	same.as.matrix = TRUE,
 	yaxis.lab = NULL,
-	xaxis.lab = c('WES','panelCN.mops','CNVkit'),
+	xaxis.lab = c('WES','ctDNA panel'),
 	xaxis.cex = 0.6,
 	xaxis.tck = 0,
 	yaxis.tck = 0,
@@ -227,7 +214,7 @@ summarized.plot <- create.heatmap(
 create.multipanelplot(
 	plot.objects = list(per.exon, summarized.plot),
 	plot.objects.heights = 1,
-	plot.objects.widths = c(7,1),
+	plot.objects.widths = c(8,1),
 	layout.height = 1,
 	layout.width = 2,
 	x.spacing = 2,
