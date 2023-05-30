@@ -11,29 +11,34 @@ compare_tumour_content_estimates.R # compare all tumour content estimations
 compare_tumour_content_max_vaf.R # use maximum somatic VAF to estimate tumour content
 contrast_fragment_sizes_CCNE1.R # compare fragmentation profiles between CCNE1-amp and non-amp
 custom_format_ensemble_mutations.R # generate ensemble mutation calls (no matched normals)
-extract_fragment_sizes.R # extract global fragment sizes
-extract_fragment_sizes__sites.R # extract fragment sizes at specific sites
+examine_fragment_sizes_global.R # collect global fragment sizes and compare to 'normal'
+examine_fragment_sizes_mutations.R # collect site-specific fragment sizes and compare REF to ALT
+extract_fragment_sizes.R # extract global fragment sizes using R biovizBase
+extract_fragment_sizes__sites.R # extract fragment sizes at specific sites using R biovizBase
 extract_triallelic_sites_mutect.R # use MuTect (v1) stats file to identify triallelic sites
-filter_mavis_to_regions.R
-find_reversions.R
+filter_mavis_to_regions.R # filter MAVIS SV calls to target regions
+find_reversions.R # compare variant calls to identify potential reversion sites
 find_triallelic_snps.R # use bam-readcounts for germline SNP to find triallelic variants
 format_and_plot_tumour_content_bamreadcount.R # create plots for tumour content and clearance
-format_mutations_for_cbio.R # format mutations calls for cbioportal
+format_mutations_for_cbio.R # format mutations calls for cbioportal (combine WXS and ctDNA)
 format_readcount_output.R
 plot_coverage.R
 plot_reversions.R
+plot_wxs_ctdna_comparison.R
 run_panelCN_mops.R # custom version from pipeline-suite; use to evaluate alternate parameters
 summary_stats_clearance.R # is clearnace associated with cohort/age/response/etc
+summary_stats_fragmentsize.R # is fragment size associated with cohort/age/response/etc
 summary_stats_tumorContent.R # is tumour content associated with cohort/age/response/etc
 survival_stats_clearance.R # is clearance associated with OS | DFS
 survival_stats_fragmentsize.R # is proportion of short/long fragments associate with OS | DFS
-survival_stats_reversions.R
+survival_stats_reversions.R # are reversions associated with OS | DFS
 validate_mutation_calls.R # contrast WXS and ctDNA variants
 
+# manuscript figures
 plot_sample_timeline.R # create a pretty timeline plot (figure 1)
 make_validation_venn.R # make a venn diagram of exome vs ctdna calls
 manuscript_figure2.R # make figure 2 for manuscript (tumour content)
-plot_CN_mops_data.R # plot results from CN mops
+plot_CN_mops_data.R # plot results from CN mops (supp figure 7)
 plot_mutation_summary.R # make figure 4 for manuscript
 examine_fragment_sizes_global.R # compare/plot global fragment sizes (figure 3)
 examine_fragment_sizes_mutations.R # compare/plot fragment sizes at target mutation sites (figure 3)
