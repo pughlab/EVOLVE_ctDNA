@@ -53,7 +53,7 @@ master.matrix <- merge(
 surv.data <- master.matrix[!is.na(master.matrix$delta),];
 
 groups <- rep(0, nrow(surv.data));
-groups[which(surv.data$delta > -10)] <- 1;
+groups[which(surv.data$delta > 0)] <- 1;
 
 # collect survival stats
 survtime <- surv.data$OS.Months;
@@ -142,7 +142,7 @@ create.km.plot(
 	key.groups.corner = c(1,1),
 	key.groups.x.pos = 1,
 	key.groups.y.pos = 0.85,
-	statistical.method = 'cox',
+	statistical.method = 'logrank',
 #	predefined.p = 2*pnorm(-abs(summary(output)$coef[1,4])),
 #	statistical.result.hr = summary(output)$conf.int[1,1],
 	filename = generate.filename('EVOLVE_ctDNA', 'dfs_by_clearance', 'png'),

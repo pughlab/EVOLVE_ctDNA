@@ -206,11 +206,6 @@ surv.data <- master.matrix[!is.na(master.matrix$p.value),];
 groups <- rep(0, nrow(surv.data));
 groups[which(surv.data$p.value < 0.05)] <- 1;
 
-plot.groups <- rep(0, nrow(surv.data));
-plot.groups[which(surv.data$p.value < 0.05)] <- 1;
-plot.groups[which(surv.data$p.value < 0.05 & surv.data$FC < 1)] <- 2;
-labels <- c('ns','+ve','-ve');
-
 # collect survival stats
 survtime <- surv.data$DFS.Months;
 survstat <- as.numeric(surv.data$DFS.Status);
@@ -224,7 +219,12 @@ output <- fit.coxmodel(
 	return.cox.model = TRUE
 	);
 
-# make a km plot
+# make a km plot showing all 3 groups (no change, increase, decrease)
+plot.groups <- rep(0, nrow(surv.data));
+plot.groups[which(surv.data$p.value < 0.05)] <- 1;
+plot.groups[which(surv.data$p.value < 0.05 & surv.data$FC < 1)] <- 2;
+labels <- c('ns','+ve','-ve');
+
 create.km.plot(
 	survival.object = survobj,
 	patient.groups = plot.groups,
@@ -251,6 +251,47 @@ create.km.plot(
 	predefined.hr = summary(output)$conf.int[1,1],
 	predefined.hr.ci = summary(output)$conf.int[1,3:4],
 	filename = generate.filename('EVOLVE_ctDNA_dfs_by', paste0(metric,'_alt'), 'png'),
+	style = 'Nature'
+	);
+
+# make a km plot showing only 2 groups (change, no change)
+plot.groups <- rep(0, nrow(surv.data));
+plot.groups[which(surv.data$p.value < 0.05)] <- 1;
+labels <- c('no difference in FS','difference (p < 0.05)');
+alt.labels <- c(
+	'no difference',
+	'     difference'
+	);
+
+create.km.plot(
+	survival.object = survobj,
+	patient.groups = plot.groups,
+	xlab.label = 'Time (months)',
+	ylab.label = 'DFS Proportion',
+	ylab.axis.padding = 5,
+	ylab.cex = 2,
+	xlab.cex = 2,
+	yaxis.cex = 1.5,
+	xaxis.cex = 1.5,
+	line.colours = c('turquoise3','violetred3'),
+	risk.labels = alt.labels,
+#	risk.label.fontface = 'plain',
+	risk.label.pos = -3.6,
+	left.padding = 4,
+	key.groups.labels = labels,
+	key.groups.cex = 1.5,
+	key.stats.corner = c(1,1),
+	key.stats.x.pos = 1,
+	key.stats.y.pos = 1,
+	key.groups.corner = c(1,1),
+	key.groups.x.pos = 1,
+	key.groups.y.pos = 0.85,
+	statistical.method = 'cox',
+	explicit.HR.label = FALSE,
+	#predefined.p = 2*pnorm(-abs(summary(output)$coef[1,4])),
+	#predefined.hr = summary(output)$conf.int[1,1],
+	#predefined.hr.ci = summary(output)$conf.int[1,3:4],
+	filename = generate.filename('EVOLVE_ctDNA', '_dfs_by_pvalue__Fig3D', 'png'),
 	style = 'Nature'
 	);
 

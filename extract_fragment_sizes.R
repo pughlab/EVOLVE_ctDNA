@@ -8,7 +8,7 @@ library(argparse);
 parser <- ArgumentParser();
 
 parser$add_argument('-i', '--input', type = 'character', help = 'path to input file (BAM)');
-parser$add_argument('-o', '--output', type = 'character', help = 'path to output directory');
+parser$add_argument('-o', '--output_dir', type = 'character', help = 'path to output directory');
 parser$add_argument('-s', '--sample', type = 'character', help = 'project name');
 parser$add_argument('-r', '--ref_type', type = 'character', help = 'reference genome (hg38 or hg19)',
 	default = 'hg38');
@@ -58,7 +58,7 @@ save.session.profile <- function(file.name) {
 	}
 
 # function to read in BAM and extract fragment information
-createFragSet <- function (sampleID, filePath, refGenome = "BSgenome.Hsapiens.UCSC.hg38", chr.select = paste0("chr", 1:22), width_min = 90, width_max = 220, mapQthreshold = 30) {
+createFragSet <- function (sampleID, filePath, refGenome = "BSgenome.Hsapiens.UCSC.hg38", chr.select = paste0("chr", 1:22), mapQthreshold = 30) {
 
 	indexed.bam = gsub("$", ".bai", filePath)
 	if (!file.exists(indexed.bam)) { indexBam(filePath); }
@@ -82,7 +82,6 @@ createFragSet <- function (sampleID, filePath, refGenome = "BSgenome.Hsapiens.UC
 		);
 
 	w.all <- width(frags);
-	frags <- frags[which(w.all >= width_min & w.all <= width_max)];
 	hsapiens <- getBSgenome(refGenome);
 	gcs <- GCcontent(hsapiens, unstrand(frags));
 	frags$gc <- gcs;
@@ -119,6 +118,7 @@ if (arguments$ref_type == 'hg38') {
 	} else {
 	genome <- 'BSgenome.Hsapiens.UCSC.hg19';
 	}
+
 # read in target positions (+ any annotations; ie, Sample or Gene names)
 target.gr <- NULL;
 if (!is.null(arguments$targets)) {
@@ -134,49 +134,62 @@ fset <- createFragSet(
 	filePath = arguments$input,
 	refGenome = genome,
 	chr.select = chromosomes,
-	width_min = 90,
-	width_max = 320,
 	mapQthreshold = 30
 	);
 
-# overlap fragment data with target intervals
 frags.gr <- fset$frags_Granges;
-fragments <- frags.gr[queryHits(findOverlaps(frags.gr, target.gr))];
 
-# count fragment sizes per bin
-w <- width(fragments);
-frag.list <- split(fragments, w);
-counts <- sapply(frag.list, function(x) countOverlaps(target.gr, x));
+# move to output directory
+setwd(arguments$output_dir);
 
-short.idx <- as.character(90:150);
-norm.idx <- as.character(151:230);
-long.idx <- as.character(231:320);
-
-intervals$short <- rowSums(counts[,intersect(colnames(counts),short.idx)]);	# 90-150 bp
-intervals$normal <- rowSums(counts[,intersect(colnames(counts),norm.idx)]);	# 151-230 bp
-intervals$long <- rowSums(counts[,intersect(colnames(counts),long.idx)]);       # 231-320 bp
-
-ratio.short <- intervals$short/intervals$normal;
-ratio.short[is.nan(ratio.short) | is.infinite(ratio.short)] <- NA;
-intervals$ratio.short <- ratio.short;
-
-ratio.long <- intervals$long/intervals$normal;
-ratio.long[is.nan(ratio.long) | is.infinite(ratio.long)] <- NA;
-intervals$ratio.long <- ratio.long;
-
-intervals$nfrags <- apply(intervals[,c('short', 'normal', 'long')],1,sum);
-intervals$coverage <- intervals$nfrags/sum(intervals$nfrags, na.rm = TRUE);
-
-# format for output
-results <- as.data.frame(intervals);
-
-write.table(
-	results,
-	file = arguments$output,
-	row.names = FALSE,
-	col.names = TRUE,
-	sep = '\t'
+# save fragment sizes
+save(
+	frags.gr,
+	file = generate.filename(arguments$sample, 'fragment_sizes','RData')
 	);
+
+# get counts per interval
+if (!is.null(arguments$targets)) {
+
+	# overlap fragment data with target intervals
+	fragments <- frags.gr[queryHits(findOverlaps(frags.gr, target.gr))];
+
+	# count fragment sizes per bin
+	w <- width(fragments);
+	frag.list <- split(fragments, w);
+	counts <- sapply(frag.list, function(x) countOverlaps(target.gr, x));
+
+	short.idx <- as.character(90:150); # define short reads (90-150 bp)
+	norm.idx <- as.character(151:230); # define 'normal' reads (151-230 bp)
+	long.idx <- as.character(231:320); # define long reads (231-320 bp)
+
+	intervals$short <- rowSums(counts[,intersect(colnames(counts),short.idx)]);	# 90-150 bp
+	intervals$normal <- rowSums(counts[,intersect(colnames(counts),norm.idx)]);	# 151-230 bp
+	intervals$long <- rowSums(counts[,intersect(colnames(counts),long.idx)]);       # 231-320 bp
+
+	ratio.short <- intervals$short/intervals$normal;
+	ratio.short[is.nan(ratio.short) | is.infinite(ratio.short)] <- NA;
+	intervals$ratio.short <- ratio.short;
+
+	ratio.long <- intervals$long/intervals$normal;
+	ratio.long[is.nan(ratio.long) | is.infinite(ratio.long)] <- NA;
+	intervals$ratio.long <- ratio.long;
+
+	intervals$nfrags <- rowSums(counts); #apply(intervals[,c('short', 'normal', 'long')],1,sum);
+	intervals$coverage <- intervals$nfrags/sum(intervals$nfrags, na.rm = TRUE);
+
+	intervals$Prop.short <- intervals$short / intervals$nfrags;
+	intervals$Prop.long <- intervals$long / intervals$nfrags;
+
+	# write output to file
+	write.table(
+		as.data.frame(intervals),
+		file = generate.filename(arguments$sample, 'per_bin_sizes','tsv'),
+		row.names = FALSE,
+		col.names = TRUE,
+		sep = '\t'
+		);
+	}
 
 ### SAVE SESSION INFO ##############################################################################
 save.session.profile(generate.filename('ExtractFragmentSizes','SessionProfile','txt'));

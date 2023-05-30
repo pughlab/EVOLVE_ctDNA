@@ -261,7 +261,7 @@ plot.data <- plot.data[,c('VAF.Ar','VAF.Bx','VAF.Pr','VAF.ct.baseline','VAF.ct.o
 
 # calculate clearance
 plot.data$delta <- apply(
-	plot.data[,grepl('VAF.ct', colnames(plot.data))],
+	plot.data[,c('VAF.ct.baseline','VAF.ct.on.trial')],
 	1,
 	function(i) {
 		i <- na.omit(i);
@@ -327,7 +327,7 @@ tissue.plot <- create.heatmap(
 	col.pos = which(tissue > 0, arr.ind = T)[,2]
 	);
 
-tissue.plot$xlab$label <- 'VAF (WXS)';
+tissue.plot$xlab$label <- 'VAF (WES)';
 tissue.plot$xlab$cex <- 1;
 tissue.plot$xlab$fontface <- 'plain';
 

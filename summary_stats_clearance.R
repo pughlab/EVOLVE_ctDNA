@@ -29,7 +29,7 @@ colnames(vaf.reshaped) <- gsub('Final\\.','',colnames(vaf.reshaped));
 
 # calculate clearance
 vaf.reshaped$delta <- apply(
-	vaf.reshaped[,c('baseline','on.trial','EOT')],
+	vaf.reshaped[,c('baseline','on.trial')],
 	1,
 	function(i) {
 		i <- na.omit(i);
@@ -206,8 +206,9 @@ create.multipanelplot(
 	right.legend.padding = 0,
 	bottom.legend.padding = 0,
 	top.legend.padding = 0,
-	ylab.axis.padding = 1,
+	ylab.axis.padding = 2,
 	xlab.axis.padding = 2,
+	y.spacing = 1,
 	height = 4.5,
 	width = 12,
 	resolution = 800,

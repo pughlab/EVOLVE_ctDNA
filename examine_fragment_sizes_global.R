@@ -295,6 +295,8 @@ tmp <- data.frame(
 
 plot.data <- droplevels(rbind(plot.data, tmp));
 
+plot.data$Sample <- as.factor(plot.data$Sample);
+
 for (group in c('baseline','on.trial','EOT')) {
 
 	legend.lab <- if (group == 'baseline') {
