@@ -178,7 +178,7 @@ smp.covariate.grob <- covariates.grob(
 	covariates = smp.covariates,
 	ord = 1:nrow(clinical),
 	side = 'right',
-	size = 0.5,
+	size = 0.6,
 	grid.col = list(col = 'white', lwd = 1),
 	col.lines = 1:length(smp.covariates)
 	);
@@ -227,8 +227,17 @@ smp.legend.grob <- legend.grob(
 	title.cex = 0.8,
 	title.fontface = 'plain',
 	title.just = 'left',
-	size = 1,
+	size = 1.5,
 	layout = c(1, length(smp.legends))
+	);
+
+covariate.key <- list(
+	text = list(
+		lab = c('Cohort','Tissue','gBRCA','Age','Response','DFS','OS'),
+		cex = 0.8,
+		adj = 1
+		),
+	padding.text = 0.65
 	);
 
 dot.key <- list(
@@ -256,10 +265,10 @@ timeline.plot <- create.scatterplot(
 	xat = seq(0,30,5),
 	xaxis.lab = seq(0,30,5),
 	right.padding = 1,
-	left.padding = 20,
+	left.padding = 18,
 	ylimits = c(0.5, max(timeline$Group)+0.5),
 	yat = seq(1, max(timeline$Group),1),
-	yaxis.lab = paste0(levels(timeline$Patient), '              '),
+	yaxis.lab = paste0(levels(timeline$Patient), '                    '),
 	yaxis.cex = 0.95,
 	xaxis.cex = 1,
 	xaxis.tck = c(0.5,0),
@@ -268,9 +277,10 @@ timeline.plot <- create.scatterplot(
 	xlab.cex = 1.5,
 	ylab.label = NULL,
 	legend = list(
-		inside = list(fun = smp.covariate.grob, x = -0.295, y = 0.5),
+		inside = list(fun = smp.covariate.grob, x = -0.345, y = 0.5),
 		inside = list(fun = draw.key, args = list(dot.key), x = 0.63, y = 0.8),
-		inside = list(fun = smp.legend.grob, x = -1.45, y = 0.96)
+		inside = list(fun = smp.legend.grob, x = -1.39, y = 0.99),
+		inside = list(fun = draw.key(vp = viewport(angle = 90), key = covariate.key), x = -0.34, y = 0.01)
 		),
 	style = 'Nature'
 	);
