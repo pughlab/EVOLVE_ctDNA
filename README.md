@@ -2,9 +2,9 @@
 
 ## Summary
 
-Patients with high grade serous ovarian cancer (HGSOC) treated with PARP inhibitors frequently develop resistance, leading to disease progression. Previously, we identified several mechanisms of resistance at time of progression among patients in EVOLVE, including reversion mutations in BRCA1 or BRCA2, amplifications of CCNE1 and/or upregulation of ABCB1. Here, we examined the feasibility of profiling circulating tumor DNA (ctDNA) by targeted sequencing to identify mutations in the absence of tumour tissue, and to identify emerging mechanisms of resistance early in the course of treatment.
+Patients with high grade serous ovarian cancer (HGSOC) treated with PARP inhibitors frequently develop resistance, leading to disease progression. Previously, we identified several mechanisms of resistance at time of progression among patients in EVOLVE, including reversion mutations in *BRCA1* or *BRCA2*, amplifications of *CCNE1* and/or upregulation of *ABCB1*. Here, we examined the feasibility of profiling circulating tumor DNA (ctDNA) by targeted sequencing to identify mutations in the absence of tumour tissue, and to identify emerging mechanisms of resistance early in the course of treatment.
 
-Lheureux et al. Identifying mechanisms of resistance by circulating tumour DNA in EVOLVE, a Phase II Trial of Cediranib Plus Olaparib for Ovarian Cancer at time of PARP Inhibitor Progression. Clin Cancer Res 2023 (https://doi.org/10.1158/1078-0432.ccr-23-0797).
+Lheureux *et al*. Identifying mechanisms of resistance by circulating tumour DNA in EVOLVE, a Phase II Trial of Cediranib Plus Olaparib for Ovarian Cancer at time of PARP Inhibitor Progression. Clin Cancer Res 2023 (https://doi.org/10.1158/1078-0432.ccr-23-0797).
 
 ## Data Availability
 
