@@ -1,26 +1,27 @@
-## Manuscript Figures
-# organize and plot clinical information and sample timelines (Figure 1)
-Rscript plot_sample_timeline.R
+# Manuscript Figures
+### Main figures
+#### Figure 1: organize and plot clinical information and sample timelines
+*Rscript plot_sample_timeline.R*
 
 
-# examine estimated tumour fraction of circulating DNA over time (Figure 2)
-Rscript manuscript_figure2.R
+#### Figure 2: examine estimated tumour fraction of circulating DNA over time
+*Rscript manuscript_figure2.R*
 
 
-# examine fragmentation profiles as a way to evaluate tumour content (Figure 3 | Supplementary Figure 5)
-Rscript examine_fragment_sizes_global.R
-Rscript examine_fragment_sizes_mutations.R
+#### Figure 3: examine fragmentation profiles as a way to evaluate tumour content (also Supplementary Figure 5)
+*Rscript examine_fragment_sizes_global.R*
+*Rscript examine_fragment_sizes_mutations.R*
 
 
-# create SNV (and CNV) heatmap for both wxs and ctDNA (Figure 4)
-Rscript plot_mutation_summary.R
+#### Figure 4: create SNV (and CNV) heatmap for both wxs and ctDNA
+*Rscript plot_mutation_summary.R*
+
+### Supplemental Figures
+#### Supplementary Figure 6B: examine overlap in variant calls between WES of matched tumour tissue and ctDNA
+*make_validation_venn.R*
 
 
-# examine overlap in variant calls between WES of matched tumour tissue and ctDNA (Supplementary Figure 6B)
-make_validation_venn.R
-
-
-# plot CCNE1 copy-number results (Supplementary Figure 7)
-plot_CN_mops_data.R
+#### Supplementary Figure 7: plot CCNE1 copy-number results
+*plot_CN_mops_data.R*
 
 
