@@ -1,17 +1,45 @@
-### plot_validated_snvs.R ##########################################################################
-# Plot status of known (exome) mutations detected in ctDNA
+### plot_mutation_summary.R ########################################################################
+# Plot somatic mutation profile of ctDNA, indicated expected result (based on prior whole-exome
+# sequencing of the matched tumour tissue) where possible
+
+### FUNCTIONS ######################################################################################
+# function to generate a standardized filename
+generate.filename <- function(project.stem, file.core, extension, include.date = TRUE) {
+
+	# build up the filename
+	file.name <- paste(project.stem, file.core, sep = '_');
+	file.name <- paste(file.name, extension, sep = '.');
+
+	if (include.date) {
+		file.name <- paste(Sys.Date(), file.name, sep = '_');
+		}
+
+	return(file.name);
+	}
+
+# function to write session profile to file
+save.session.profile <- function(file.name) {
+
+	# open the file
+	sink(file = file.name, split = FALSE);
+
+	# write memory usage to file
+	cat('### MEMORY USAGE ###############################################################');
+	print(proc.time());
+
+	# write sessionInfo to file
+	cat("\n### SESSION INFO ###############################################################");
+	print(sessionInfo());
+
+	# close the file
+	sink();
+
+	}
 
 ### PREPARE SESSION ################################################################################
 # import libraries
 library(BoutrosLab.plotting.general);
-library(GenomicRanges);
-
-source('/cluster/home/sprokope/git/analysis/helper_functions/session.functions.R');
-
-input.dir <- '/cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/';
-output.dir <- '/cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/paper_figures/';
-
-setwd(input.dir);
+#library(GenomicRanges);
 
 ### VARIANT CODING
 # 1 = missense, 2 = stop gain, 3 = stop loss, 4 = splicing, 5 = frameshift, 6 = in frame indel, 7 = tss
@@ -23,145 +51,40 @@ variant.codes <- data.frame(
 		"Translation_Start_Site", "ITD"),
 	Group = c('other','other','other','RNA','other','other','other','other','missense',
 		'splice_site','splice_site','in_frame_indel','in_frame_indel','frameshift_del',
-		'frameshift_ins', 'nonsense', 'nonstop', 'tss', 'itd'),
-	Code = c(9, 9, 9, 8, 9, 9, 9, 9, 1, 4, 4, 7, 7, 6, 5, 2, 3, 7, 10)
+		'frameshift_ins', 'nonsense', 'nonstop', 'tss', 'itd')
 	);
-
-#variant.colours <- c('darkseagreen4','darkorchid4','#9AA3F2','yellow','darkorange3','#F9B38E','turquoise1','plum','grey50')
-#names(variant.colours) <- c('missense','nonsense','nonstop','splicing','frameshift_ins','frameshift_del','tss','RNA','noncoding');
 
 # for these plots, we will ignore some variant types
 variant.colours <- c('darkseagreen4','#9AA3F2','yellow','darkorange3','#F9B38E','grey50')
 names(variant.colours) <- c('missense','nonsense','splicing','frameshift_ins','frameshift_del','noncoding');
 
-variant.codes$NEW.CODE <- c(1:6)[match(variant.codes$Group, c('missense','nonsense','splice_site','frameshift_ins','frameshift_del','other'))];
+variant.codes$Code <- c(1:6)[match(variant.codes$Group, c('missense','nonsense','splice_site','frameshift_ins','frameshift_del','other'))];
 
 # list samples to exclude
 smps.without.wxs <- c('EVO-009-014-Ar','EVO-009-018-Bx','EVO-400-004-Bx');
 smps.without.ctdna <- c('EVO-009-025-Ar','EVO-009-025-Bx','EVO-400-001-Ar','EVO-400-001-Bx','EVO-400-002-Ar','EVO-400-002-Bx','EVO-400-006-Ar','EVO-400-006-Bx');
 
 ### READ DATA ######################################################################################
-# get target regions
-target_bed <- read.delim('CHARM-MMR_plus_EVOLVE_hg38.bed', header = FALSE)
-colnames(target_bed) <- c('Chromosome','Start','End','ID','V5','Strand');
-
 # get clinical covariates
-load('2022-09-06_EVOLVE_ctDNA_clinicalCovariates.RData');
+load('/Users/sprokopec/git/EVOLVE_ctDNA/data/EVOLVE_ctDNA__clinical_timeline.RData');
 
-sample.info <- read.delim('configs/2022-09-06_sample_info_with_batch.txt');
+# get mutation data
+load('/Users/sprokopec/git/EVOLVE_ctDNA/data/EVOLVE_ctDNA__mutation_data.RData');
 
-# read in data
-timeline <- read.delim(
-	'cBioportal/EVOLVE_ctDNA_20220908/data_clinical_timeline_specimen.txt', stringsAsFactors = FALSE);
-cbio.data <- read.delim('cBioportal/EVOLVE_ctDNA_20220908/mutation_data_extended.txt', stringsAsFactors = FALSE);
-
-# get cnv data (for CCNE1 amplifications)
-cnvkit <- read.delim('CNVKit/cnv_calls_with_purity__ci/2022-09-12_EVOLVE_ctDNA__cnvkit_calls.tsv');
-mops <- read.delim('panelCNmops/sp_v1/2022-10-20_EVOLVE_ctDNA__summarized_CCNE1_calls.tsv');
-
-# get purity estimates
-purity <- read.delim('Ensemble_calls/tumour_content/2022-09-06_EVOLVE_ctDNA__estimated_tumour_content.tsv');
-
-# move to output directory
-setwd(output.dir);
+# get estimated ctDNA levels
+tumour.content <- read.delim('/Users/sprokopec/git/EVOLVE_ctDNA/data/estimated_tumour_content.txt')
 
 ### FORMAT PLOT DATA ###############################################################################
-cbio.data$Patient <- substr(cbio.data$Tumor_Sample_Barcode, 0, 11);
-
-# get clinical data (for sorting)
-timeline <- timeline[order(timeline$PATIENT_ID, timeline$START_DATE),c(1,5,2,7)];
-timeline$SAMPLE_ID <- gsub('_ctDNA','', timeline$SAMPLE_ID);
-timeline <- timeline[-which(timeline$SAMPLE_ID %in% smps.without.wxs),];
-timeline <- timeline[-which(timeline$SAMPLE_ID %in% smps.without.ctdna),];
-
-# indicate samples to keep (some exome do not have ctdna)
-keep.exome.smps <- timeline[which(timeline$SPECIMEN_TYPE == 'TISSUE'),]$SAMPLE_ID;
-
-# format target regions
-target_bed$Start <- target_bed$Start - 100;
-target_bed$End <- target_bed$End + 100;
-
-target.gr <- makeGRangesFromDataFrame(
-	target_bed[,1:3],
-	ignore.strand = TRUE,
-	starts.in.df.are.0based = TRUE
-	);
-
-evolve.gr <- makeGRangesFromDataFrame(
-	cbio.data[which(cbio.data$Mutation_Status == 'somatic'),],
-	seqnames.field = 'Chromosome',
-	start.field = 'Start_Position',
-	end.field = 'End_Position',
-	ignore.strand = TRUE,
-	keep.extra.columns = TRUE
-	);
-
-# filter data to target regions
-cbio.filtered <- data.frame(subsetByOverlaps(evolve.gr, target.gr));
-colnames(cbio.filtered)[1:3] <- c('Chromosome','Start_Position','End_Position');
-
-key.fields <- c('Patient','Tumor_Sample_Barcode','Hugo_Symbol','Chromosome','Start_Position','End_Position','Variant_Classification','Variant_Type','HGVSc','HGVSp','HGVSp_Short','t_depth','t_ref_count','t_alt_count','n_depth','n_ref_count','n_alt_count');
-
-# filter a few synonymous/intronic variants
-cbio.filtered <- cbio.filtered[which(cbio.filtered$Consequence != 'synonymous_variant'),];
-cbio.filtered <- cbio.filtered[which(cbio.filtered$Consequence != 'intron_variant'),];
-
-# merge exome and ctDNA by position
-exome.smps <- which(
-	!is.na(cbio.filtered$Matched_Norm_Sample_Barcode) &
-	cbio.filtered$Tumor_Sample_Barcode %in% keep.exome.smps
-	);
-ctdna.smps <- which(is.na(cbio.filtered$Matched_Norm_Sample_Barcode));
-
-merged <- merge(
-	cbio.filtered[exome.smps,key.fields],
-	cbio.filtered[ctdna.smps,key.fields[1:14]],
-	by = c('Patient','Hugo_Symbol','Chromosome','Start_Position','End_Position','Variant_Classification','Variant_Type','HGVSc','HGVSp','HGVSp_Short'),
-	suffixes = c('.wxs','.ctdna'),
-	all = TRUE
-	);
-
-# and only targeted genes
-merged <- merged[which(merged$Hugo_Symbol %in% c('TP53','BRCA1','BRCA2','PALB2','ABCB1','CCNE1')),];
-
-# calculate VAF
-merged$t_vaf.wxs <- merged$t_alt_count.wxs / merged$t_depth.wxs
-merged$t_vaf.ctdna <- merged$t_alt_count.ctdna / merged$t_depth.ctdna
-merged[which(merged$t_vaf.ctdna < 0.01),]$t_vaf.ctdna <- NA;
-
 # apply variant coding
-merged$Code <- variant.codes$NEW.CODE[match(merged$Variant_Classification, variant.codes$Classification)];
+mutation.data$Code <- variant.codes$Code[match(
+	mutation.data$Variant_Classification,
+	variant.codes$Classification)];
 
-# was the WXS mutation validated in ctDNA?
-merged$Validated <- 0;
-merged[which(merged$t_vaf.wxs > 0),]$Validated <- 1;
-
-# sort data
-merged <- merged[order(merged$Patient, merged$Hugo_Symbol, -merged$t_vaf.wxs, -merged$t_vaf.ctdna, na.last = TRUE),];
-
-# remove redundant entries
-to.remove <- intersect(
-	which(duplicated(merged[,c('Patient','Hugo_Symbol','Tumor_Sample_Barcode.ctdna')])),
-	which(is.na(merged$Tumor_Sample_Barcode.wxs))
-	);
-
-if (length(to.remove) > 0) {
-	merged <- merged[-to.remove,];
-	}
-
-# fix sample names
-merged$Tumor_Sample_Barcode.ctdna <- gsub('_ctDNA','',merged$Tumor_Sample_Barcode.ctdna);
-
-# drop any ONLY ctDNA variant with VAF < 0.01
-if (any(is.na(merged$t_vaf.ctdna) & is.na(merged$t_vaf.wxs))) {
-	merged <- merged[-which(is.na(merged$t_vaf.ctdna) & is.na(merged$t_vaf.wxs)),];
-	}
-
-## format data for plotting
+# reshape data for plotting
 plot.data <- reshape(
-	unique(merged[!is.na(merged$Tumor_Sample_Barcode.ctdna),c('Hugo_Symbol','Tumor_Sample_Barcode.ctdna','Code')]),
+	unique(mutation.data[!is.na(mutation.data$Sample),c('Hugo_Symbol','Sample','Code')]),
 	direction = 'wide',
-	timevar = 'Tumor_Sample_Barcode.ctdna',
+	timevar = 'Sample',
 	idvar = 'Hugo_Symbol'
 	);
 
@@ -170,9 +93,9 @@ plot.data <- plot.data[,-1];
 colnames(plot.data) <- gsub('Code\\.','',colnames(plot.data));
 
 dot.data <- reshape( 
-	unique(merged[!is.na(merged$Tumor_Sample_Barcode.ctdna),c('Hugo_Symbol','Tumor_Sample_Barcode.ctdna','Validated')]),
+	unique(mutation.data[!is.na(mutation.data$Sample),c('Hugo_Symbol','Sample','Validated')]),
 	direction = 'wide',
-	timevar = 'Tumor_Sample_Barcode.ctdna',
+	timevar = 'Sample',
 	idvar = 'Hugo_Symbol'
 	);
 
@@ -181,25 +104,18 @@ dot.data <- dot.data[,-1];
 colnames(dot.data) <- gsub('Validated\\.','',colnames(dot.data));
 
 # order data
-all.patients <- unique(timeline[which(timeline$SPECIMEN_TYPE == 'BLOOD'),]$PATIENT_ID);
+all.patients <- as.character(unique(
+	timeline[which(timeline$Sample != ''),]$Patient
+	));
 
-phenodata <- merge(
-	clinical,
-	sample.info,
-	by.x = 'Patient.ID',
-	by.y = 'Patient',
-	all = TRUE
-	);
-
-phenodata <- phenodata[which(phenodata$Patient.ID %in% all.patients),];
-phenodata$Patient.ID <- factor(phenodata$Patient.ID, levels = unique(timeline$PATIENT_ID));
-phenodata$Sample <- gsub('_ctDNA','',phenodata$Sample);
+phenodata <- timeline[which(timeline$Sample != ''),];
+phenodata$Patient <- factor(phenodata$Patient, levels = all.patients);
 phenodata$Group <- factor(phenodata$Group, levels = c('baseline','on.trial','EOT'));
-phenodata <- phenodata[order(phenodata$Patient.ID, phenodata$Group),];
+phenodata <- phenodata[order(phenodata$Patient, phenodata$Group),];
 
 phenodata$ORDER <- NA;
 for (patient in all.patients) {
-	idx <- which(phenodata$Patient.ID == patient);
+	idx <- which(phenodata$Patient == patient);
 	phenodata[idx,]$ORDER <- 1:length(idx);
 	}
 
@@ -212,7 +128,7 @@ plot.data[is.na(plot.data)] <- 0;
 dot.data[is.na(dot.data)] <- 0;
 
 # fill in missing mutations (in WXS but not ctDNA)
-missing.muts <- unique(merged[which(merged$Validated == 1),c('Patient','Hugo_Symbol')]);
+missing.muts <- unique(mutation.data[which(mutation.data$Validated == 1),c('Patient','Hugo_Symbol')]);
 
 for (i in 1:nrow(missing.muts)) {
 
@@ -227,30 +143,22 @@ for (i in 1:nrow(missing.muts)) {
 	}
 
 # indicate reversions
-dot.data['BRCA1',grepl('EVO-009-001', colnames(dot.data))] <- 4; # somatic snp + somatic DEL
-dot.data['BRCA1',grepl('EVO-009-003', colnames(dot.data))] <- 3; # germline snp + somatic snp
-dot.data['BRCA1',grepl('EVO-009-013', colnames(dot.data))] <- 4; # germline snp + somatic indel
-dot.data['BRCA1',grepl('EVO-009-023', colnames(dot.data))] <- 3; # germline snp + somatic indel
+for (i in 1:nrow(reversion.data)) {
+	patient <- reversion.data[i,]$Patient;
+	gene <- reversion.data[i,]$Hugo_Symbol;
+	dot.data[gene, grepl(patient, colnames(dot.data))] <- reversion.data[i,]$Dot.Code;
+	plot.data[gene, grepl(patient, colnames(plot.data))] <- reversion.data[i,]$BG.Code;
+ 	}
 
-plot.data['BRCA2',grepl('EVO-009-006', colnames(plot.data))] <- 6; # triallelic
-dot.data['BRCA2',grepl('EVO-009-006', colnames(dot.data))] <- 4; # triallelic
- 
 # indicate CCNE1 amplifications
 plot.data['CCNE1',] <- 0;
 dot.data['CCNE1',] <- 0;
 
 # based on original EVOLVE publication
 wxs.with.ccne1.amps <- c('EVO-009-004','EVO-009-006','EVO-009-007','EVO-009-009','EVO-009-011','EVO-400-007','EVO-400-008');
-#wxs.with.ccne1.amps <- c('EVO-009-002','EVO-009-004','EVO-009-006','EVO-009-007','EVO-009-008','EVO-009-009','EVO-009-011');	# based on OVSuperset
-#ctdna.with.ccne1.amps <- c('EVO-009-004_C2D1','EVO-009-007_C2D1','EVO-009-013_Screening','EVO-009-013_C2D1','EVO-009-017_C2D1','EVO-009-020_C2D1','EVO-009-023_C2D1','EVO-009-024_C2D1','EVO-400-003_C2D1');
 
-# use CNVKit data
-#ccne1.amps <- cnvkit[which(cnvkit$gene == 'CCNE1' & cnvkit$cn >= 4),];
-#ccne1.amps <- cnvkit[which(cnvkit$gene == 'CCNE1' & cnvkit$log2 > 2),];
 # use panelCN.mops data
-ccne1.amps <- mops[which(mops$Call == 1),];
-
-ctdna.with.ccne1.amps <- gsub('_ctDNA','',as.character(ccne1.amps$Sample));
+ctdna.with.ccne1.amps <- gsub('_ctDNA','',as.character(cna.data[which(cna.data$Call == 1),]$Sample));
 
 # fill in findings
 plot.data['CCNE1',ctdna.with.ccne1.amps] <- 7;
@@ -265,14 +173,20 @@ gene.order <- c('TP53','BRCA1','BRCA2','PALB2','CCNE1');
 plot.data <- plot.data[gene.order,phenodata$Sample];
 dot.data <- dot.data[gene.order,phenodata$Sample];
 
-# fix coding (for heatmap colours)
-#plot.data[which(plot.data == 9, arr.ind = TRUE)] <- 8;
-
 # format purity estimates
-purity$Sample <- gsub('_ctDNA','',purity$Sample);
-purity.estimates <- merge(phenodata[,c('Patient.ID','Sample','ORDER')], purity[,c('Patient.ID','Sample','Final')]);
+tumour.content$Sample <- gsub('_ctDNA','',tumour.content$Sample);
 
-purity.estimates <- purity.estimates[order(purity.estimates$Patient.ID, purity.estimates$ORDER),];
+# for cases with no TP53 mutation, use the maximum somatic VAF
+tumour.content$Final <- tumour.content$Estimate;
+na.idx <- which(is.na(tumour.content$Estimate));
+tumour.content[na.idx,]$Final <- tumour.content[na.idx,]$Max.VAF;
+
+purity.estimates <- merge(
+	phenodata[,c('Patient','Sample','ORDER')],
+	tumour.content[,c('Patient','Sample','Final')]
+	);
+
+purity.estimates <- purity.estimates[order(purity.estimates$Patient, purity.estimates$ORDER),];
 purity.estimates$Sample <- factor(purity.estimates$Sample, levels = colnames(plot.data));
 
 ### COVARIATES #####################################################################################
@@ -298,7 +212,7 @@ functional.legend <- legend.grob(
 	);
 
 # make sample covariates
-covariate.data <- phenodata;
+covariate.data <- merge(phenodata, clinical, by.x = 'Patient', by.y = 'Patient.ID', all.x = TRUE);
 
 smp.covariates <- list(
 	rect = list(
@@ -341,7 +255,7 @@ smp.covariate.grob <- covariates.grob(
 	grid.row = list(col = 'white', lwd = 1),
 	row.lines = 1:length(smp.covariates),
 	grid.col = list(col = 'white', lwd = 1),
-	col.lines = get.line.breaks(covariate.data$Patient.ID)-0.5
+	col.lines = get.line.breaks(covariate.data$Patient)-0.5
 	);
 
 smp.legends <- list(
@@ -431,7 +345,7 @@ dot.key <- list(
 
 # determine where to put lines
 patient.splits <- rep('grey90',nrow(covariate.data));
-patient.splits[get.line.breaks(covariate.data$Patient.ID)+0.5] <- 'black';
+patient.splits[get.line.breaks(covariate.data$Patient)+0.5] <- 'black';
 
 # make the plot!
 mutation.plot <- create.dotmap(
@@ -472,21 +386,13 @@ mutation.plot <- create.dotmap(
 	col.colour = patient.splits
 	);
 
-write.plot(
-	mutation.plot,
-	height = 4.4,
-	width = 15,
-	resolution = 1200,
-	filename = generate.filename('EVOLVE_ctDNA', 'SNV_validation_heatmap','png')
-	);
-
 purity.estimates$Estimate <- log10(purity.estimates$Final*1000);
 
 purity.plot <- create.scatterplot(
 	Estimate ~ Sample,
 	purity.estimates,
 	type = c('h','p'),
-	xaxis.lab = rep('',nrow(purity)),
+	xaxis.lab = rep('',nrow(tumour.content)),
 	xlab.label = NULL,
 	ylab.label = 'ctDNA level',
 	ylab.cex = 1.1,
@@ -518,9 +424,9 @@ create.multipanelplot(
 	bottom.padding = 6,
 	height = 6,
 	width = 15,
-	resolution = 1200,
-	filename = generate.filename('EVOLVE_ctDNA', '__figure4','png')
+	resolution = 200,
+	filename = generate.filename('EVOLVE_ctDNA', 'mutation_summary__Figure4','png')
 	);
 
 ### SAVE SESSION INFO ##############################################################################
-save.session.profile(generate.filename('SNVplot','SessionProfile','txt'));
+save.session.profile(generate.filename('Figure4','SessionProfile','txt'));

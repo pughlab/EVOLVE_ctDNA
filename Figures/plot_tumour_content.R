@@ -1,45 +1,75 @@
-### compare_tumour_content_max_vaf.R ###############################################################
-# Compare tumour content estimation (by TP53 mutation with bam-readcount) and by maximum VAF
+### plot_tumour_content.R ##########################################################################
+# Create plots to visualize tumour content estimation and ctDNA clearance
+
+### FUNCTIONS ######################################################################################
+# function to generate a standardized filename
+generate.filename <- function(project.stem, file.core, extension, include.date = TRUE) {
+
+	# build up the filename
+	file.name <- paste(project.stem, file.core, sep = '_');
+	file.name <- paste(file.name, extension, sep = '.');
+
+	if (include.date) {
+		file.name <- paste(Sys.Date(), file.name, sep = '_');
+		}
+
+	return(file.name);
+	}
+
+# function to write session profile to file
+save.session.profile <- function(file.name) {
+
+	# open the file
+	sink(file = file.name, split = FALSE);
+
+	# write memory usage to file
+	cat('### MEMORY USAGE ###############################################################');
+	print(proc.time());
+
+	# write sessionInfo to file
+	cat("\n### SESSION INFO ###############################################################");
+	print(sessionInfo());
+
+	# close the file
+	sink();
+
+	}
 
 ### PREPARE SESSION ################################################################################
 # import libraries
 library(BoutrosLab.plotting.general);
 
-source('/cluster/home/sprokope/git/analysis/helper_functions/session.functions.R');
-
-input.dir <- '/cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/Ensemble_calls/tumour_content';
-output.dir <- '/cluster/projects/ovgroup/projects/OV_Superset/EVOLVE/ctDNA/pipeline_suite/paper_figures';
-
-setwd(input.dir);
-
-### READ DATA ######################################################################################
-# create covariates
-load('../../2022-09-06_EVOLVE_ctDNA_clinicalCovariates.RData');
+load('/Users/sprokopec/git/EVOLVE_ctDNA/data/EVOLVE_ctDNA__clinical_timeline.RData');
 
 # read in estimated tumour content
-results <- read.delim('2022-09-06_EVOLVE_ctDNA__estimated_tumour_content.tsv', stringsAsFactors = FALSE);
-
-setwd(output.dir);
+results <- read.delim(
+	'/Users/sprokopec/git/EVOLVE_ctDNA/data/estimated_tumour_content.txt',
+	stringsAsFactors = FALSE
+	);
 
 ### FORMAT DATA ####################################################################################
+# for cases with no TP53 mutation, use the maximum somatic VAF
+results$Final <- results$Estimate;
+results[is.na(results$Estimate),]$Final <- results[is.na(results$Estimate),]$Max.VAF;
+
 # format data for scatterplot (Figure 2A)
-plot.data <- results[order(results$Patient.ID, results$Timepoint),];
-plot.data$Group.ctdna <- factor(
-	plot.data$Group.ctdna,
+plot.data <- results[order(results$Patient, results$Timepoint),];
+plot.data$Group <- factor(
+	plot.data$Group,
 	levels = c('baseline','on.trial','EOT'),
 	labels = c('baseline','on-trial','end-of-treatment')
 	);
 
 # format data for barplot (Figure 2B)
 results.wide <- reshape(
-	results[,c('Patient.ID','Group.ctdna','Final')],
+	results[,c('Patient','Group','Final')],
 	direction = 'wide',
-	idvar = 'Patient.ID',
-	timevar = 'Group.ctdna'
+	idvar = 'Patient',
+	timevar = 'Group'
 	);
 colnames(results.wide) <- gsub('Final\\.','',colnames(results.wide));
 
-# calculate clearance
+# calculate clearance (difference between on-trial (cycle 2) and baseline)
 results.wide$delta <- apply(
 	results.wide[,c('baseline','on.trial')],
 	1,
@@ -49,6 +79,7 @@ results.wide$delta <- apply(
 		}
 	);
 
+# find maximum ctDNA level for each sample (for sorting purposes)
 results.wide$max <- apply(
 	results.wide[,c('baseline','on.trial','EOT')],
 	1,
@@ -62,7 +93,13 @@ results.wide <- results.wide[order(results.wide$delta, results.wide$max, decreas
 results.wide$Order <- 1:nrow(results.wide);
 
 # add annotations to clearance data
-clearance.data <- merge(clinical[,c(1,9:11,14)], results.wide, by = 'Patient.ID');
+clearance.data <- merge(
+	clinical[,c('Patient.ID','Age.cat','Response.cat','Cohort.cat','BRCA.cat')],
+	results.wide,
+	by.x = 'Patient.ID',
+	by.y = 'Patient'
+	);
+colnames(clearance.data)[1] <- 'Patient';
 clearance.data <- clearance.data[order(clearance.data$Order),];
 
 ### COVARIATES AND LEGENDS #########################################################################
@@ -156,84 +193,22 @@ nv.key <- list(
 	);
 
 ### PLOT DATA ######################################################################################
-# plot clearance separately
-create.barplot(
-	Order ~ delta,
-	clearance.data,
-	col = point.colours[!is.na(point.colours)],
-	ylab.label = NULL,
-	xlab.label = expression(Delta * 'ctDNA'),
-	xlab.cex = 1.5,
-	xaxis.cex = 1.2,
-	yaxis.cex = 1.2,
-	xlimits = c(-120,300),
-	xat = c(-100,0,100,300),
-	yaxis.lab = rep('    ', nrow(clearance.data)),
-	xaxis.fontface = 'plain',
-	yaxis.fontface = 'plain',
-	xaxis.tck = c(1,0),
-	yaxis.tck = 0,
-	plot.horizontal = TRUE,
-	legend = list(
-		left = list(fun = smp.covariate.grob)
-		),
-	left.padding = 8,
-	style = 'Nature',
-	height = 9,
-	width = 4,
-	filename = generate.filename('EVOLVE_ctDNA', '_estimated_tumour_clearance','png')
-	);
-
-# try a scatterplot per patient?
-create.scatterplot(
-	log10(Final) ~ Group.ctdna | Patient.ID,
-	plot.data,
-	type = 'b',
-	xaxis.rot = 90,
-	x.spacing = 1,
-	y.spacing = 1,
-	as.table = TRUE,
-	xaxis.tck = c(1,0),
-	yaxis.tck = c(1,0),
-	xlab.label = NULL,
-	ylab.label = expression('Estimated Tumour Fraction'),
-	ylab.axis.padding = 2,
-	yat = log10(c(0.001,0.01,0.1,1)),
-	yaxis.lab = c(0.001,0.01,0.1,1),
-	xaxis.cex = 1.2,
-	yaxis.cex = 1.2,
-	ylab.cex = 1.5,
-	xaxis.fontface = 'plain',
-	yaxis.fontface = 'plain',
-	strip.fontface = 'plain',
-	strip.cex = 0.9,
-	layout = c(6,5),
-	legend = list(
-		inside = list(fun = draw.key, args = list(key = nv.key), x = 0.187, y = 0.5),
-		inside = list(fun = draw.key, args = list(key = nv.key), x = 0.187, y = 0.09),
-		inside = list(fun = draw.key, args = list(key = nv.key), x = 0.53, y = 0.09)
-		),
-	height = 9,
-	width = 9,
-	filename = generate.filename('EVOLVE_ctDNA', '_estimated_tumour_fraction','png')
-	);
-
 # combine them
 per.patient.plots <- list();
-plot.data$Group <- as.numeric(plot.data$Group.ctdna);
+plot.data$Group.num <- as.numeric(plot.data$Group);
 
-for (patient in unique(plot.data$Patient.ID)) {
+for (patient in unique(plot.data$Patient)) {
 
 	per.patient.plots[[patient]] <- create.scatterplot(
-		log10(Final) ~ Group | Patient.ID,
-		plot.data[which(plot.data$Patient.ID == patient),],
+		log10(Final) ~ Group.num | Patient,
+		plot.data[which(plot.data$Patient == patient),],
 		type = 'b',
 		col = covariate.colours$Response$colours[match(
 			clinical[which(clinical$Patient.ID == patient),]$Response.cat,
 			covariate.colours$Response$levels)],
 		xlimits = c(0.5,3.5),
 		xat = c(1,2,3),
-		xaxis.lab = levels(plot.data$Group.ctdna),
+		xaxis.lab = levels(plot.data$Group),
 		xaxis.tck = c(1,0),
 		yaxis.tck = c(1,0),
 		xlab.label = NULL,
@@ -302,8 +277,11 @@ figure2b <- create.barplot(
 	xaxis.tck = c(1,0),
 	yaxis.tck = 0,
 	plot.horizontal = TRUE,
-	legend = list(left = list(fun = smp.covariate.grob),
-		inside = list(fun = draw.key(vp = viewport(angle = 90), key = covariate.key), x = -0.638, y = -0.02)),
+	legend = list(
+		left = list(fun = smp.covariate.grob),
+		inside = list(fun = draw.key(vp = viewport(angle = 90), key = covariate.key),
+			x = -0.638, y = -0.02)
+			),
 	style = 'Nature'
 	);
 
@@ -326,8 +304,8 @@ create.multipanelplot(
 	ylab.axis.padding = c(3,0),
 	height = 8,
 	width = 14,
-	resolution = 1600,
-	filename = generate.filename('EVOLVE_ctDNA', '_figure2','png')
+	resolution = 200,
+	filename = generate.filename('EVOLVE_ctDNA', 'estimated_ctDNA_levels__Figure2','png')
 	);
 
 ### SAVE SESSION INFO ##############################################################################
