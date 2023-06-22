@@ -60,9 +60,6 @@ plot.objects[[1]] <- ggplot() +
 		col = c("black", "black", "red"),
 		size = 4);
 
-ggsave(outfile,
-	plot.objects[[1]], device = "pdf", width = 3.25, height = 2.5, units = "in");
-
 # summarize known/novel/chip variant sizes
 for (i in c('known','chip','novel')) {
 
@@ -117,10 +114,6 @@ for (i in c('known','chip','novel')) {
 			label = c(p, paste0("WT = ", wt), paste0("Mutant = ", mut)),
 			col = c("black", "black", "red"),
 			size = 4);
-
-	ggsave(outfile,
-		plot, device = "pdf", width = 3.25, height = 2.5, units = "in");
-
 	}
 
 # combine them!

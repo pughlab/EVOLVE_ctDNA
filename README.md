@@ -12,9 +12,9 @@ Data generated in this study are not publicly available as this is a legacy prot
 
 ## Dependencies
 
-The following R libraries are required for the regeneration of figures (R >= 3.6.1):
-- BPG (https://CRAN.R-project.org/package=BoutrosLab.plotting.general)
-- ggplot2 (https://cran.r-project.org/package=ggplot2)
+The following R libraries are required for the regeneration of figures (R >= 4.1.0):
+- BPG (https://CRAN.R-project.org/package=BoutrosLab.plotting.general; v6.0.3)
+- ggplot2 (https://cran.r-project.org/package=ggplot2; v3.3.2)
 
 ## Instructions for figure regeneration
 

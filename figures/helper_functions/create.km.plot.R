@@ -801,12 +801,12 @@ create.km.plot <- function(
 		# (i.e. fontsize, risktable.height, risktable.y) by reading in from a file
 
 		# make a list of potential locations for the reference cex file
-		optimal.risktable.parameters <- read.table(
-			file = paste('/cluster/home/sprokope/git/analysis/helper_functions', "optimal.risktable.parameters.txt", sep = '/'),
-			header = TRUE,
-			sep = "\t",
-			row.names = NULL,
-			as.is = TRUE
+		optimal.risktable.parameters <- data.frame(
+			ngroups		= 1:10,
+			fontsize	= c(rep(15,5), 14, rep(13,4)),
+			risktable.height= c(0.75, 1, 1.3, 1.5, 1.8, 1.925, 2, 2.05, 2.1, 2.1),
+			risktable.y	= c(0.1,0.2,0.1,0.03,-0.07,-0.1,-0.13,-0.13,-0.15,-0.15),
+			bottom.padding	= c(0.7,0.7,0.7,1.5,2.5,3.4,3.4,3.4,3.5,3.5)
 			);
 
 		# If ngroups is not listed in the optimal.risktable.parameters table, give a warning and 
