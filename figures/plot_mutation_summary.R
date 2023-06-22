@@ -34,14 +34,14 @@ smps.without.ctdna <- c('EVO-009-025-Ar','EVO-009-025-Bx','EVO-400-001-Ar','EVO-
 
 ### READ DATA ######################################################################################
 # load in clinical data
-load(paste0(getwd(),'/data/EVOLVE_ctDNA__clinical_timeline.RData'));
+load(paste0(getwd(),'/../data/EVOLVE_ctDNA__clinical_timeline.RData'));
 
 # get mutation data
-load(paste0(getwd(),'/data/EVOLVE_ctDNA__mutation_data.RData'));
+load(paste0(getwd(),'/../data/EVOLVE_ctDNA__mutation_data.RData'));
 
 # get estimated ctDNA levels
 tumour.content <- read.delim(
-	paste0(getwd(),'/data/estimated_tumour_content.txt'),
+	paste0(getwd(),'/../data/estimated_tumour_content.txt'),
 	stringsAsFactors = FALSE
 	);
 

@@ -15,13 +15,13 @@ source(paste0(getwd(),'/helper_functions/calculate.number.at.risk.R'));
 source(paste0(getwd(),'/helper_functions/create.km.plot.R'));
 
 # get clinical covariates
-load(paste0(getwd(),'/data/EVOLVE_ctDNA__clinical_timeline.RData'));
+load(paste0(getwd(),'/../data/EVOLVE_ctDNA__clinical_timeline.RData'));
 
 # get global fragment data 
-load(paste0(getwd(),'/data/EVOLVE_ctDNA__fragmentation_summary.RData'));
+load(paste0(getwd(),'/../data/EVOLVE_ctDNA__fragmentation_summary.RData'));
 
 # get mutation-specific fragment data 
-load(paste0(getwd(),'/data/EVOLVE_ctDNA__mutation_frgment_size.RData'));
+load(paste0(getwd(),'/../data/EVOLVE_ctDNA__mutation_frgment_size.RData'));
 
 ### FORMAT DATA ####################################################################################
 # add annotations to global summary data

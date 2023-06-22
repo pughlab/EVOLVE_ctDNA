@@ -9,11 +9,11 @@ library(BoutrosLab.plotting.general);
 source(paste0(getwd(),'/helper_functions/session.functions.R'));
 
 # load in clinical data
-load(paste0(getwd(),'/data/EVOLVE_ctDNA__clinical_timeline.RData'));
+load(paste0(getwd(),'/../data/EVOLVE_ctDNA__clinical_timeline.RData'));
 
 # read in estimated tumour content
 results <- read.delim(
-	paste0(getwd(), '/data/estimated_tumour_content.txt'),
+	paste0(getwd(), '/../data/estimated_tumour_content.txt'),
 	stringsAsFactors = FALSE
 	);
 

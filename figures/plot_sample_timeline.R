@@ -9,7 +9,7 @@ library(BoutrosLab.plotting.general);
 source(paste0(getwd(),'/helper_functions/session.functions.R'));
 
 # load in data
-load(paste0(getwd(),'/data/EVOLVE_ctDNA__clinical_timeline.RData'));
+load(paste0(getwd(),'/../data/EVOLVE_ctDNA__clinical_timeline.RData'));
 
 ### FORMAT DATA ####################################################################################
 # get list of patients
