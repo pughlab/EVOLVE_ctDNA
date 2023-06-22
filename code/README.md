@@ -12,6 +12,7 @@
 - compare_tumour_content_max_vaf.R : use maximum somatic VAF to estimate tumour content
 - collect_global_fragment_sizes.R : collect and format fragment sizes (global)
 - collect_mutation_fragment_sizes.R : collect and format fragment sizes (mutation-specific)
+- collect_tp53_fragment_sizes.R : collect and format fragment sizes (TP53 mutations)
 - contrast_fragment_sizes_CCNE1.R : compare fragmentation profiles between CCNE1-amp and non-amp
 - custom_format_ensemble_mutations.R : generate ensemble mutation calls (no matched normals)
 - extract_fragment_sizes.R : extract global fragment sizes using R biovizBase
