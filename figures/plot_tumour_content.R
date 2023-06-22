@@ -1,4 +1,4 @@
-### plot_tumour_content.R ##########################################################################
+### figure2__plot_tumour_content.R #################################################################
 # Create plots to visualize tumour content estimation and ctDNA clearance
 
 ### PREPARE SESSION ################################################################################
