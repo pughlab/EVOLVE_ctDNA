@@ -14,9 +14,7 @@ Data generated in this study are not publicly available as this is a legacy prot
 
 The following R libraries are required for the regeneration of figures (R >= 3.6.1):
 - BPG (https://CRAN.R-project.org/package=BoutrosLab.plotting.general)
-- VennDiagram (https://cran.r-project.org/package=VennDiagram)
 - ggplot2 (https://cran.r-project.org/package=ggplot2)
-- GenomicRanges (https://bioconductor.org/packages/release/bioc/html/GenomicRanges.html)
 
 ## Instructions for figure regeneration
 
