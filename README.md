@@ -17,3 +17,11 @@ The following R libraries are required for the regeneration of figures (R >= 3.6
 - VennDiagram (https://cran.r-project.org/package=VennDiagram)
 - ggplot2 (https://cran.r-project.org/package=ggplot2)
 - GenomicRanges (https://bioconductor.org/packages/release/bioc/html/GenomicRanges.html)
+
+## Instructions for figure regeneration
+
+To re-create the primary figures presented in the above paper:
+1) install R and all above dependencies
+2) clone this repository (git clone git@github.com:pughlab/EVOLVE_ctDNA.git)
+3) from a terminal, cd to the 'figures' directory (EVOLVE_ctDNA/figures)
+4) run each .R file using 'Rscript' (ie, Rscript figure1__plot_sample_timeline.R)
