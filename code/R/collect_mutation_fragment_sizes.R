@@ -34,10 +34,16 @@ maf <- maf[which(maf$Mutation_Status == 'somatic'),];
 maf <- maf[which(maf$Variant_Type == 'SNP'),];
 
 maf$Patient <- substr(maf$Tumor_Sample_Barcode,0,11);
+maf$Exome <- 0;
+maf[!grepl('ctDNA', maf$Tumor_Sample_Barcode),]$Exome <- 1;
 
-# first, let's only look at KNOWN somatic mutation sites
-snp.data <- unique(maf[!grepl('ctDNA',maf$Tumor_Sample_Barcode),c('Patient','Hugo_Symbol','Chromosome','Start_Position','End_Position','Reference_Allele','Tumor_Seq_Allele2')]);
-snp.data <- snp.data[which(snp.data$Hugo_Symbol %in% c('TP53','BRCA1','BRCA2')),];
+# make sure to note which are KNOWN somatic mutation sites
+snp.data <- aggregate(
+	Exome ~ Patient + Hugo_Symbol + Chromosome + Start_Position + End_Position + Reference_Allele + Tumor_Seq_Allele2,
+	maf[,c('Patient','Hugo_Symbol','Chromosome','Start_Position','End_Position','Reference_Allele','Tumor_Seq_Allele2','Exome')],
+	max
+	);
+
 snp.data$MUTATION <- paste(
 	snp.data$Chromosome,
 	snp.data$Start_Position,
@@ -49,7 +55,7 @@ snp.data$MUTATION <- paste(
 # compare fragment sizes (alt vs ref)
 stats.data <- merge(
 	purity[,c('Patient.ID','Sample','Group.ctdna')],
-	snp.data[,c('Patient','Hugo_Symbol','MUTATION')],
+	snp.data[,c('Patient','Hugo_Symbol','MUTATION','Exome')],
 	by.x = 'Patient.ID',
 	by.y = 'Patient',
 	all.x = TRUE
@@ -61,7 +67,8 @@ stats.data[,c('Total.REF','Total.ALT','Median.REF','Median.ALT')] <- NA;
 stats.data[,c('Median.FC','p.value','short.ratio','Mean.REF','Mean.ALT')] <- NA;
 
 # read in and process data
-fragment.data <- list();
+all.fragment.data <- list();
+known.fragment.data <- list();
 
 for (file in input.files) {
 
@@ -70,6 +77,8 @@ for (file in input.files) {
 
 	idx <- which(stats.data$Sample == smp & stats.data$MUTATION == variant);
 	if (length(idx) == 0) { next; }
+
+	is.exome <- (stats.data[idx,]$Exome == 1);
 
 	# get fragment sizes for each mutation
 	ref <- as.numeric(read.delim(sub('alt','ref',file), header = FALSE)$V1);
@@ -96,12 +105,23 @@ for (file in input.files) {
 		length(all.reads[which(all.reads >= 151 & all.reads < 231)]);
 
 	# save data to per-sample ref/alt list
-	if (smp %in% names(fragment.data)) {
-		fragment.data[[smp]]$alt <- c(fragment.data[[smp]]$alt, alt);
-		fragment.data[[smp]]$ref <- c(fragment.data[[smp]]$ref, ref);
+	if (smp %in% names(all.fragment.data)) {
+		all.fragment.data[[smp]]$alt <- c(all.fragment.data[[smp]]$alt, alt);
+		all.fragment.data[[smp]]$ref <- c(all.fragment.data[[smp]]$ref, ref);
 		} else {
-		fragment.data[[smp]]$alt <- alt;
-		fragment.data[[smp]]$ref <- ref;
+		all.fragment.data[[smp]]$alt <- alt;
+		all.fragment.data[[smp]]$ref <- ref;
+		}
+
+	# save exome-specific mutation data to per-sample ref/alt list
+	if (is.exome & (stats.data[idx,]$Hugo_Symbol %in% c('TP53','BRCA1','BRCA2'))) {
+		if (smp %in% names(known.fragment.data)) {
+			known.fragment.data[[smp]]$alt <- c(known.fragment.data[[smp]]$alt, alt);
+			known.fragment.data[[smp]]$ref <- c(known.fragment.data[[smp]]$ref, ref);
+			} else {
+			known.fragment.data[[smp]]$alt <- alt;
+			known.fragment.data[[smp]]$ref <- ref;
+			}
 		}
 
 	gc();
@@ -118,13 +138,55 @@ write.table(
 	sep = '\t'
 	);
 
-# do some quick tests
+# do some quick reformatting for easier plotting later
 ref.data <- list();
 alt.data <- list();
 
-for (smp in names(fragment.data)) {
-	ref.data[[smp]] <- fragment.data[[smp]]$ref;
-	alt.data[[smp]] <- fragment.data[[smp]]$alt;
+for (smp in names(known.fragment.data)) {
+	ref.data[[smp]] <- known.fragment.data[[smp]]$ref;
+	alt.data[[smp]] <- known.fragment.data[[smp]]$alt;
+	}
+
+# summarize mutation data (is ALT different from REF?)
+ref.v.alt.results <- data.frame(
+	Sample = names(all.fragment.data),
+	Median.FC.all = NA,
+	short.ratio.all = NA,
+	p.value.all = NA,
+	Median.FC.known = NA,
+	short.ratio.known = NA,
+	p.value.known = NA
+	);
+
+for (i in 1:nrow(ref.v.alt.results)) {
+
+	smp <- ref.v.alt.results[i,]$Sample;
+
+	# all mutations detected in ctDNA
+	median.REF <- median(all.fragment.data[[smp]]$ref);
+	median.ALT <- median(all.fragment.data[[smp]]$alt);
+	ref.v.alt.results[i,]$Median.FC.all <- median.ALT / median.REF;
+	all.reads <- c(all.fragment.data[[smp]]$ref,all.fragment.data[[smp]]$alt);
+	ref.v.alt.results[i,]$short.ratio.all <- length(all.reads[which(all.reads >= 90 & all.reads < 151)]) /
+		length(all.reads[which(all.reads >= 151 & all.reads < 231)]);
+	ref.v.alt.results[i,]$p.value.all <- tryCatch(
+		expr = wilcox.test(all.fragment.data[[smp]]$ref, all.fragment.data[[smp]]$alt)$p.value,
+		error = function(e) { NA }
+		);
+
+	# only known mutations (from WES of tissue)
+	if (smp %in% names(known.fragment.data)) {
+		median.REF <- median(known.fragment.data[[smp]]$ref);
+		median.ALT <- median(known.fragment.data[[smp]]$alt);
+		ref.v.alt.results[i,]$Median.FC.known <- median.ALT / median.REF;
+		all.reads <- c(known.fragment.data[[smp]]$ref,known.fragment.data[[smp]]$alt);
+		ref.v.alt.results[i,]$short.ratio.known <- length(all.reads[which(all.reads >= 90 & all.reads < 151)]) /
+			length(all.reads[which(all.reads >= 151 & all.reads < 231)]);
+		ref.v.alt.results[i,]$p.value.known <- tryCatch(
+			expr = wilcox.test(known.fragment.data[[smp]]$ref, known.fragment.data[[smp]]$alt)$p.value,
+			error = function(e) { NA }
+			);
+		}
 	}
 
 # format data to save
@@ -135,10 +197,13 @@ mutation.data$Sample <- gsub('_ctDNA', '', mutation.data$Sample);
 names(ref.data) <- gsub('_ctDNA','', names(ref.data));
 names(alt.data) <- gsub('_ctDNA','', names(alt.data));
 
+ref.v.alt.results$Sample <- gsub('_ctDNA','', ref.v.alt.results$Sample);
+
 save(
 	ref.data,
 	alt.data,
 	mutation.data,
+	ref.v.alt.results,
 	file = 'EVOLVE_ctDNA__mutation_fragment_size.RData'
 	);
 

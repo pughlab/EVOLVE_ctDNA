@@ -26,10 +26,19 @@
 - plot_coverage.R
 - plot_reversions.R
 - plot_wxs_ctdna_comparison.R
+
 - run_panelCN_mops.R : custom version from pipeline-suite; use to evaluate alternate parameters
 - plot_CN_mops_data.R : plot CCNE1 copy-number findings (per-exon)
+
 - validate_mutation_calls.R : contrast WXS and ctDNA variants
 - make_validation_venn.R : make venn diagram to visualize overlap between variant calls from tissue exome and ctDNA
+
+- summary_stats_tumorContent.R : is estimated tumour content associated with cohort/age/response/etc?
+- summary_stats_clearance.R : is clearnace (change in ctDNA levels between baseline cycle 2 of treatment) associated with cohort/age/response/etc?
+- summary_stats_fragmentsize.R : is fragment size associated with cohort/age/response/etc?
+- survival_stats_clearance.R : is clearance associated with OS or DFS?
+- survival_stats_fragmentsize.R : is proportion of short/long fragments associate with OS or DFS?
+- survival_stats_reversions.R : are reversions associated with OS or DFS?
 
 ## bash
 - run_spliceAI.sh : run spliceAI on somatic mutation sites

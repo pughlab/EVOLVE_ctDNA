@@ -2,52 +2,26 @@
 # Visualize differences in global fragment sizes between tumour/normal samples, and 
 # mutation-specific fragment sizes within tumour cohorts.
 
-### FUNCTIONS ######################################################################################
-# function to generate a standardized filename
-generate.filename <- function(project.stem, file.core, extension, include.date = TRUE) {
-
-	# build up the filename
-	file.name <- paste(project.stem, file.core, sep = '_');
-	file.name <- paste(file.name, extension, sep = '.');
-
-	if (include.date) {
-		file.name <- paste(Sys.Date(), file.name, sep = '_');
-		}
-
-	return(file.name);
-	}
-
-# function to write session profile to file
-save.session.profile <- function(file.name) {
-
-	# open the file
-	sink(file = file.name, split = FALSE);
-
-	# write memory usage to file
-	cat('### MEMORY USAGE ###############################################################');
-	print(proc.time());
-
-	# write sessionInfo to file
-	cat("\n### SESSION INFO ###############################################################");
-	print(sessionInfo());
-
-	# close the file
-	sink();
-
-	}
-
 ### PREPARE SESSION ################################################################################
 # import libraries
 library(BoutrosLab.plotting.general);
+library(survival);
+
+# load in helper functions (used for survival analyses)
+source(paste0(getwd(),'/helper_functions/session.functions.R'));
+source(paste0(getwd(),'/helper_functions/fit.coxmodel.R'));
+source(paste0(getwd(),'/helper_functions/ph.fails.R'));
+source(paste0(getwd(),'/helper_functions/calculate.number.at.risk.R'));
+source(paste0(getwd(),'/helper_functions/create.km.plot.R'));
 
 # get clinical covariates
-load('/Users/sprokopec/git/EVOLVE_ctDNA/data/EVOLVE_ctDNA__clinical_timeline.RData');
+load(paste0(getwd(),'/data/EVOLVE_ctDNA__clinical_timeline.RData'));
 
 # get global fragment data 
-load('/Users/sprokopec/git/EVOLVE_ctDNA/data/EVOLVE_ctDNA__fragmentation_summary.RData');
+load(paste0(getwd(),'/data/EVOLVE_ctDNA__fragmentation_summary.RData'));
 
 # get mutation-specific fragment data 
-load('/Users/sprokopec/git/EVOLVE_ctDNA/data/EVOLVE_ctDNA__mutation_frgment_size.RData');
+load(paste0(getwd(),'/data/EVOLVE_ctDNA__mutation_frgment_size.RData'));
 
 ### FORMAT DATA ####################################################################################
 # add annotations to global summary data
@@ -60,6 +34,27 @@ results <- merge(
 
 results[grep('HC', results$Sample),]$Group <- 'normal';
 results$Group <- factor(results$Group, levels = c('normal', 'baseline','on.trial','EOT'));
+
+# format survival data
+survival.data <- merge(
+	merge(
+		timeline[which(timeline$Group == 'baseline'),c('Patient','Sample','Group')],
+		clinical,
+		by.x = 'Patient',
+		by.y = 'Patient.ID'
+		),
+	ref.v.alt.results[,c('Sample','p.value.all')],
+	by = 'Sample'
+	);
+
+# organize groups
+groups <- rep(0, nrow(survival.data));
+groups[which(survival.data$p.value.all < 0.05)] <- 1;
+
+# collect survival stats
+survtime <- survival.data$DFS.Months;
+survstat <- as.numeric(survival.data$DFS);
+survobj <- Surv(survtime, survstat);
 
 # get some comparison metrics (global)
 normal.idx <- which(results$Group == 'normal');
@@ -463,6 +458,38 @@ write.plot(
 	width = 8,
 	resolution = 200,
 	filename = generate.filename('EVOLVE_ctDNA','fragment_size_distribution__Figure3C', 'png')
+	);
+
+# make a km plot showing DFS by fragment size (difference or no difference in REF/ALT size at mutation sites)
+labels <- c('no difference in FS','difference (p < 0.05)');
+alt.labels <- c('no difference', '     difference');
+
+create.km.plot(
+	survival.object = survobj,
+	patient.groups = groups,
+	xlab.label = 'Time (months)',
+	ylab.label = 'DFS Proportion',
+	ylab.axis.padding = 5,
+	ylab.cex = 2,
+	xlab.cex = 2,
+	yaxis.cex = 1.5,
+	xaxis.cex = 1.5,
+	line.colours = c('turquoise3','violetred3'),
+	risk.labels = alt.labels,
+	risk.label.pos = -3.6,
+	left.padding = 4,
+	key.groups.labels = labels,
+	key.groups.cex = 1.5,
+	key.stats.corner = c(1,1),
+	key.stats.x.pos = 1,
+	key.stats.y.pos = 1,
+	key.groups.corner = c(1,1),
+	key.groups.x.pos = 1,
+	key.groups.y.pos = 0.85,
+	statistical.method = 'cox',
+	explicit.HR.label = FALSE,
+	filename = generate.filename('EVOLVE_ctDNA', 'dfs_by_fragment_size_pvalue__Figure3D', 'png'),
+	style = 'Nature'
 	);
 
 ### SAVE SESSION INFO ##############################################################################

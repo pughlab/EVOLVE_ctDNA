@@ -2,44 +2,12 @@
 # Plot somatic mutation profile of ctDNA, indicated expected result (based on prior whole-exome
 # sequencing of the matched tumour tissue) where possible
 
-### FUNCTIONS ######################################################################################
-# function to generate a standardized filename
-generate.filename <- function(project.stem, file.core, extension, include.date = TRUE) {
-
-	# build up the filename
-	file.name <- paste(project.stem, file.core, sep = '_');
-	file.name <- paste(file.name, extension, sep = '.');
-
-	if (include.date) {
-		file.name <- paste(Sys.Date(), file.name, sep = '_');
-		}
-
-	return(file.name);
-	}
-
-# function to write session profile to file
-save.session.profile <- function(file.name) {
-
-	# open the file
-	sink(file = file.name, split = FALSE);
-
-	# write memory usage to file
-	cat('### MEMORY USAGE ###############################################################');
-	print(proc.time());
-
-	# write sessionInfo to file
-	cat("\n### SESSION INFO ###############################################################");
-	print(sessionInfo());
-
-	# close the file
-	sink();
-
-	}
-
 ### PREPARE SESSION ################################################################################
 # import libraries
 library(BoutrosLab.plotting.general);
-#library(GenomicRanges);
+
+# load in helper functions
+source(paste0(getwd(),'/helper_functions/session.functions.R'));
 
 ### VARIANT CODING
 # 1 = missense, 2 = stop gain, 3 = stop loss, 4 = splicing, 5 = frameshift, 6 = in frame indel, 7 = tss
@@ -65,14 +33,17 @@ smps.without.wxs <- c('EVO-009-014-Ar','EVO-009-018-Bx','EVO-400-004-Bx');
 smps.without.ctdna <- c('EVO-009-025-Ar','EVO-009-025-Bx','EVO-400-001-Ar','EVO-400-001-Bx','EVO-400-002-Ar','EVO-400-002-Bx','EVO-400-006-Ar','EVO-400-006-Bx');
 
 ### READ DATA ######################################################################################
-# get clinical covariates
-load('/Users/sprokopec/git/EVOLVE_ctDNA/data/EVOLVE_ctDNA__clinical_timeline.RData');
+# load in clinical data
+load(paste0(getwd(),'/data/EVOLVE_ctDNA__clinical_timeline.RData'));
 
 # get mutation data
-load('/Users/sprokopec/git/EVOLVE_ctDNA/data/EVOLVE_ctDNA__mutation_data.RData');
+load(paste0(getwd(),'/data/EVOLVE_ctDNA__mutation_data.RData'));
 
 # get estimated ctDNA levels
-tumour.content <- read.delim('/Users/sprokopec/git/EVOLVE_ctDNA/data/estimated_tumour_content.txt')
+tumour.content <- read.delim(
+	paste0(getwd(),'/data/estimated_tumour_content.txt'),
+	stringsAsFactors = FALSE
+	);
 
 ### FORMAT PLOT DATA ###############################################################################
 # apply variant coding
