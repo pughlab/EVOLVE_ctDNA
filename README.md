@@ -11,7 +11,8 @@ Lheureux *et al*. Identifying mechanisms of resistance by circulating tumour DNA
 Data generated in this study are not publicly available as this is a legacy protocol for which patients did not consent to sharing of primary sequence data. Only minimal data are provided here for the reproduction of key manuscript figures.
 
 ## Dependencies
-The following R libraries are required for the regeneration of figures:
+
+The following R libraries are required for the regeneration of figures (R >= 3.6.1):
 - BPG (https://CRAN.R-project.org/package=BoutrosLab.plotting.general)
 - VennDiagram (https://cran.r-project.org/package=VennDiagram)
 - ggplot2 (https://cran.r-project.org/package=ggplot2)
