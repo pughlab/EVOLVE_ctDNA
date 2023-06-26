@@ -27,7 +27,8 @@ plot.data <- results[order(results$Patient, results$Timepoint),];
 plot.data$Group <- factor(
 	plot.data$Group,
 	levels = c('baseline','on.trial','EOT'),
-	labels = c('baseline','on-trial','end-of-treatment')
+	labels = c('baseline','on-trial','EOT')
+#	labels = c('baseline','on-trial','end-of-treatment')
 	);
 
 # format data for barplot (Figure 2B)
@@ -264,15 +265,15 @@ create.multipanelplot(
 	x.spacing = 9,
 	right.padding = 1,
 	top.padding = 0,
-	bottom.padding = 7,
+	bottom.padding = 1,
 	legend = list( inside = list(fun = smp.legend.grob, x = 0.69, y = 0.56) ),
 	left.legend.padding = 0,
 	right.legend.padding = 0,
 	bottom.legend.padding = 0,
 	top.legend.padding = 0,
-	xlab.axis.padding = -15,
+	xlab.axis.padding = -5,
 	ylab.axis.padding = c(3,0),
-	height = 8,
+	height = 7,
 	width = 14,
 	resolution = 200,
 	filename = generate.filename('EVOLVE_ctDNA', 'estimated_ctDNA_levels__Figure2','png')
